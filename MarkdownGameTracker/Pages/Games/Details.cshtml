@@ -57,7 +57,60 @@
         </div>
         <div class="game-screenshot-grid" data-game-screenshot-grid></div>
     </div>
+    <div class="game-video-section" data-game-video hidden>
+        <div class="game-video-heading">
+            <div>
+                <span class="eyebrow">Video</span>
+                <h3 data-game-video-title>Game video</h3>
+            </div>
+            <span>Video listed by IGDB</span>
+        </div>
+        <div class="game-video-frame">
+            <iframe data-game-video-frame
+                    title=""
+                    loading="lazy"
+                    referrerpolicy="strict-origin-when-cross-origin"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowfullscreen></iframe>
+        </div>
+    </div>
 </section>
+
+<div class="modal fade game-screenshot-viewer"
+     id="gameScreenshotViewer"
+     tabindex="-1"
+     aria-labelledby="gameScreenshotViewerLabel"
+     aria-hidden="true"
+     data-game-screenshot-viewer>
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title fs-5" id="gameScreenshotViewerLabel">Screenshots</h2>
+                <span class="game-screenshot-counter" data-screenshot-counter aria-live="polite"></span>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close image viewer"></button>
+            </div>
+            <div class="modal-body">
+                <button class="game-screenshot-navigation game-screenshot-previous"
+                        type="button"
+                        data-screenshot-previous
+                        aria-label="View previous screenshot">
+                    <svg aria-hidden="true" viewBox="0 0 24 24">
+                        <path d="M15 18 9 12l6-6" />
+                    </svg>
+                </button>
+                <img data-screenshot-viewer-image alt="" referrerpolicy="no-referrer">
+                <button class="game-screenshot-navigation game-screenshot-next"
+                        type="button"
+                        data-screenshot-next
+                        aria-label="View next screenshot">
+                    <svg aria-hidden="true" viewBox="0 0 24 24">
+                        <path d="m9 18 6-6-6-6" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <section class="game-description-card"
          aria-labelledby="gameDescriptionHeading"

@@ -12,12 +12,17 @@ internal sealed record IgdbGame(
     [property: JsonPropertyName("first_release_date")] long? FirstReleaseDate,
     [property: JsonPropertyName("cover")] IgdbImage? Cover,
     [property: JsonPropertyName("artworks")] IgdbImage[]? Artworks,
-    [property: JsonPropertyName("screenshots")] IgdbImage[]? Screenshots);
+    [property: JsonPropertyName("screenshots")] IgdbImage[]? Screenshots,
+    [property: JsonPropertyName("videos")] IgdbGameVideo[]? Videos);
 
 internal sealed record IgdbImage(
     [property: JsonPropertyName("image_id")] string ImageId,
     [property: JsonPropertyName("width")] int? Width,
     [property: JsonPropertyName("height")] int? Height);
+
+internal sealed record IgdbGameVideo(
+    [property: JsonPropertyName("name")] string? Name,
+    [property: JsonPropertyName("video_id")] string VideoId);
 
 internal sealed record IgdbQueryResult(bool Succeeded, IgdbGame[] Games)
 {

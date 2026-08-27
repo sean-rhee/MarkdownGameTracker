@@ -18,16 +18,76 @@
   const artworkCredit = mediaPanel.querySelector("[data-artwork-credit]");
   const screenshotSection = mediaPanel.querySelector("[data-game-screenshots]");
   const screenshotGrid = mediaPanel.querySelector("[data-game-screenshot-grid]");
+  const videoSection = mediaPanel.querySelector("[data-game-video]");
+  const videoTitle = mediaPanel.querySelector("[data-game-video-title]");
+  const videoFrame = mediaPanel.querySelector("[data-game-video-frame]");
+  const screenshotViewer = document.querySelector("[data-game-screenshot-viewer]");
+  const screenshotViewerImage = screenshotViewer?.querySelector("[data-screenshot-viewer-image]");
+  const screenshotCounter = screenshotViewer?.querySelector("[data-screenshot-counter]");
+  const previousScreenshot = screenshotViewer?.querySelector("[data-screenshot-previous]");
+  const nextScreenshot = screenshotViewer?.querySelector("[data-screenshot-next]");
   const gameTitle = mediaPanel.dataset.gameTitle;
   const gameId = card.dataset.gameId;
   const selectionStore = window.GameGardenIgdbSelection;
   let matchesLoaded = false;
   let matchesLoading = false;
   let selectedIgdbId = selectionStore.get(gameId);
+  let viewerScreenshots = [];
+  let currentScreenshotIndex = 0;
+
+  const renderScreenshotViewer = () => {
+    const screenshot = viewerScreenshots[currentScreenshotIndex];
+    if (!screenshot || !screenshotViewerImage || !screenshotCounter) {
+      return;
+    }
+
+    screenshotViewerImage.src = screenshot.fullSizeUrl;
+    screenshotViewerImage.alt = screenshot.alt;
+    screenshotCounter.textContent = `${currentScreenshotIndex + 1} of ${viewerScreenshots.length}`;
+
+    const hasMultipleScreenshots = viewerScreenshots.length > 1;
+    previousScreenshot.hidden = !hasMultipleScreenshots;
+    nextScreenshot.hidden = !hasMultipleScreenshots;
+  };
+
+  const moveScreenshot = (offset) => {
+    if (viewerScreenshots.length < 2) {
+      return;
+    }
+
+    currentScreenshotIndex = (
+      currentScreenshotIndex + offset + viewerScreenshots.length
+    ) % viewerScreenshots.length;
+    renderScreenshotViewer();
+  };
+
+  const openScreenshotViewer = (index) => {
+    if (!screenshotViewer || !window.bootstrap?.Modal) {
+      return false;
+    }
+
+    currentScreenshotIndex = index;
+    renderScreenshotViewer();
+    window.bootstrap.Modal.getOrCreateInstance(screenshotViewer).show();
+    return true;
+  };
 
   const showMessage = (message, state) => {
     body.textContent = message;
     card.dataset.descriptionState = state;
+  };
+
+  const getSafeVideoEmbedUrl = (value) => {
+    try {
+      const url = new URL(value);
+      return url.protocol === "https:"
+        && url.hostname === "www.youtube-nocookie.com"
+        && /^\/embed\/[A-Za-z0-9_-]{11}$/.test(url.pathname)
+        ? url.href
+        : null;
+    } catch {
+      return null;
+    }
   };
 
   const getDescriptionUrl = (igdbGameId) => {
@@ -60,12 +120,18 @@
     artworkCredit.hidden = true;
     screenshotSection.hidden = true;
     screenshotGrid.replaceChildren();
+    videoSection.hidden = true;
+    videoTitle.textContent = "Game video";
+    videoFrame.title = "";
+    videoFrame.removeAttribute("src");
+    viewerScreenshots = [];
   };
 
   const renderMedia = (result) => {
     clearMedia();
     const screenshots = Array.isArray(result.screenshots) ? result.screenshots : [];
-    if (!result.heroUrl && !result.coverUrl && screenshots.length === 0) {
+    const videoEmbedUrl = getSafeVideoEmbedUrl(result.video?.embedUrl);
+    if (!result.heroUrl && !result.coverUrl && screenshots.length === 0 && !videoEmbedUrl) {
       return;
     }
 
@@ -84,13 +150,23 @@
     artworkCredit.hidden = false;
 
     if (screenshots.length > 0) {
+      viewerScreenshots = screenshots.map((screenshot, index) => ({
+        fullSizeUrl: screenshot.fullSizeUrl,
+        alt: `Screenshot ${index + 1} from ${result.matchedTitle ?? gameTitle}`
+      }));
+
       for (const [index, screenshot] of screenshots.entries()) {
         const link = document.createElement("a");
         link.className = "game-screenshot-link";
         link.href = screenshot.fullSizeUrl;
         link.target = "_blank";
         link.rel = "noopener noreferrer";
-        link.setAttribute("aria-label", `Open screenshot ${index + 1} from ${result.matchedTitle ?? gameTitle}`);
+        link.setAttribute("aria-label", `View screenshot ${index + 1} from ${result.matchedTitle ?? gameTitle}`);
+        link.addEventListener("click", (event) => {
+          if (openScreenshotViewer(index)) {
+            event.preventDefault();
+          }
+        });
 
         const image = document.createElement("img");
         image.src = screenshot.thumbnailUrl;
@@ -103,7 +179,27 @@
 
       screenshotSection.hidden = false;
     }
+
+    if (videoEmbedUrl) {
+      const name = result.video.name?.trim() || "Game video";
+      videoTitle.textContent = name;
+      videoFrame.title = `${name} for ${result.matchedTitle ?? gameTitle}`;
+      videoFrame.src = videoEmbedUrl;
+      videoSection.hidden = false;
+    }
   };
+
+  previousScreenshot?.addEventListener("click", () => moveScreenshot(-1));
+  nextScreenshot?.addEventListener("click", () => moveScreenshot(1));
+  screenshotViewer?.addEventListener("keydown", (event) => {
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      moveScreenshot(-1);
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      moveScreenshot(1);
+    }
+  });
 
   const renderDescription = (result, requestedIgdbId) => {
     switch (result.status) {

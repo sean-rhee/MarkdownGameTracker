@@ -174,7 +174,7 @@
 }
 
 .game-screenshot-link::after {
-  content: "↗";
+  content: "⛶";
   position: absolute;
   right: 0.45rem;
   bottom: 0.4rem;
@@ -206,6 +206,143 @@
 .game-screenshot-link:hover img,
 .game-screenshot-link:focus-visible img {
   transform: scale(1.025);
+}
+
+.game-screenshot-viewer .modal-dialog {
+  width: min(94vw, 1600px);
+  max-width: none;
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.game-screenshot-viewer .modal-content {
+  overflow: hidden;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-md);
+  background: #081522;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+}
+
+.game-screenshot-viewer .modal-header {
+  min-height: 62px;
+  padding: 0.85rem 1rem;
+  border-bottom-color: rgba(255, 255, 255, 0.14);
+}
+
+.game-screenshot-viewer .modal-title {
+  margin-right: auto;
+}
+
+.game-screenshot-counter {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.game-screenshot-viewer .modal-body {
+  min-height: min(72vh, 760px);
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: #050c13;
+}
+
+.game-screenshot-viewer .modal-body > img {
+  width: 100%;
+  height: min(78vh, 900px);
+  display: block;
+  object-fit: contain;
+}
+
+.game-screenshot-navigation {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  width: 3rem;
+  height: 3rem;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  background: rgba(5, 14, 23, 0.72);
+  transform: translateY(-50%);
+  backdrop-filter: blur(8px);
+}
+
+.game-screenshot-navigation svg {
+  width: 1.35rem;
+  height: 1.35rem;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.game-screenshot-navigation:hover,
+.game-screenshot-navigation:focus-visible {
+  background: rgba(39, 111, 174, 0.92);
+}
+
+.game-screenshot-navigation:focus-visible {
+  outline: 3px solid rgba(179, 217, 255, 0.7);
+  outline-offset: 3px;
+}
+
+.game-screenshot-previous {
+  left: 1rem;
+}
+
+.game-screenshot-next {
+  right: 1rem;
+}
+
+.game-video-section {
+  padding: 1.2rem;
+  border-top: 1px solid var(--border);
+}
+
+.game-video-heading {
+  margin-bottom: 0.85rem;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.game-video-heading .eyebrow {
+  margin-bottom: 0.25rem;
+}
+
+.game-video-heading h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.game-video-heading > span {
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+}
+
+.game-video-frame {
+  max-width: 1100px;
+  margin: 0 auto;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #050c13;
+}
+
+.game-video-frame iframe {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border: 0;
 }
 
 .game-description-card {

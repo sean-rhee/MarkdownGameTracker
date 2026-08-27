@@ -89,7 +89,8 @@ internal sealed class FakeIgdbDescriptionService : IIgdbDescriptionService
                 [
                     new IgdbScreenshot("https://images.igdb.com/thumb-1.jpg", "https://images.igdb.com/full-1.jpg"),
                     new IgdbScreenshot("https://images.igdb.com/thumb-2.jpg", "https://images.igdb.com/full-2.jpg")
-                ])
+                ],
+                new IgdbVideo("Gameplay Preview", "https://www.youtube-nocookie.com/embed/abcdefghijk"))
             : IgdbDescriptionResult.Available(
                 101,
                 $"{title} is a fetched description.",
@@ -193,6 +194,10 @@ internal sealed class FakeIgdbHttpHandler : HttpMessageHandler
                   "screenshots":[
                     {"image_id":"shot202a","width":1920,"height":1080},
                     {"image_id":"shot202b","width":1920,"height":1080}
+                  ],
+                  "videos":[
+                    {"name":"Gameplay Preview","video_id":"abcdefghijk"},
+                    {"name":"Launch Trailer","video_id":"lmnopqrstuv"}
                   ]
                 }]
                 """)
@@ -206,7 +211,8 @@ internal sealed class FakeIgdbHttpHandler : HttpMessageHandler
                       "first_release_date":1577836800,
                       "cover":{"image_id":"cover101"},
                       "artworks":[{"image_id":"art101","width":1920,"height":1080}],
-                      "screenshots":[{"image_id":"shot101","width":1920,"height":1080}]
+                      "screenshots":[{"image_id":"shot101","width":1920,"height":1080}],
+                      "videos":[{"name":"First Look","video_id":"123456789ab"}]
                     }]
                     """)
             : JsonResponse("""

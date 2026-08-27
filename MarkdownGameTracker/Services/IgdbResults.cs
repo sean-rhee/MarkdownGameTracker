@@ -8,7 +8,8 @@ public sealed record IgdbDescriptionResult(
     string? SourceUrl,
     string? CoverUrl,
     string? HeroUrl,
-    IReadOnlyList<IgdbScreenshot> Screenshots)
+    IReadOnlyList<IgdbScreenshot> Screenshots,
+    IgdbVideo? Video)
 {
     public const string AvailableStatus = "available";
     public const string NotConfiguredStatus = "notConfigured";
@@ -22,20 +23,23 @@ public sealed record IgdbDescriptionResult(
         string sourceUrl,
         string? coverUrl = null,
         string? heroUrl = null,
-        IReadOnlyList<IgdbScreenshot>? screenshots = null) =>
-        new(AvailableStatus, igdbGameId, description, matchedTitle, sourceUrl, coverUrl, heroUrl, screenshots ?? []);
+        IReadOnlyList<IgdbScreenshot>? screenshots = null,
+        IgdbVideo? video = null) =>
+        new(AvailableStatus, igdbGameId, description, matchedTitle, sourceUrl, coverUrl, heroUrl, screenshots ?? [], video);
 
     public static IgdbDescriptionResult NotConfigured() =>
-        new(NotConfiguredStatus, null, null, null, null, null, null, []);
+        new(NotConfiguredStatus, null, null, null, null, null, null, [], null);
 
     public static IgdbDescriptionResult NotFound() =>
-        new(NotFoundStatus, null, null, null, null, null, null, []);
+        new(NotFoundStatus, null, null, null, null, null, null, [], null);
 
     public static IgdbDescriptionResult Unavailable() =>
-        new(UnavailableStatus, null, null, null, null, null, null, []);
+        new(UnavailableStatus, null, null, null, null, null, null, [], null);
 }
 
 public sealed record IgdbScreenshot(string ThumbnailUrl, string FullSizeUrl);
+
+public sealed record IgdbVideo(string Name, string EmbedUrl);
 
 public sealed record IgdbGameMatch(
     long IgdbGameId,

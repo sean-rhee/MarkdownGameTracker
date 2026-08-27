@@ -94,6 +94,9 @@ public sealed class IgdbTests
             "https://images.igdb.com/igdb/image/upload/t_1080p/artwork-remastered.jpg",
             selectedResult.HeroUrl);
         Assert.Equal(2, selectedResult.Screenshots.Count);
+        Assert.NotNull(selectedResult.Video);
+        Assert.Equal("Gameplay Preview", selectedResult.Video.Name);
+        Assert.Equal("https://www.youtube-nocookie.com/embed/abcdefghijk", selectedResult.Video.EmbedUrl);
         Assert.Equal(originalNote, await File.ReadAllTextAsync(app.GamePath("Metadata Game")));
 
         var missingResponse = await app.Client.GetAsync("/api/games/Missing/igdb-description");
@@ -155,6 +158,9 @@ public sealed class IgdbTests
             "https://images.igdb.com/igdb/image/upload/t_1080p/art202.jpg",
             description.HeroUrl);
         Assert.Equal(2, description.Screenshots.Count);
+        Assert.NotNull(description.Video);
+        Assert.Equal("Gameplay Preview", description.Video.Name);
+        Assert.Equal("https://www.youtube-nocookie.com/embed/abcdefghijk", description.Video.EmbedUrl);
         Assert.Equal(
             "https://images.igdb.com/igdb/image/upload/t_cover_small_2x/cover202.jpg",
             matches.Matches[1].CoverUrl);
@@ -164,6 +170,7 @@ public sealed class IgdbTests
         Assert.Contains("search \"Metadata Game\"", handler.GameQueries[1]);
         Assert.Contains("where version_parent = null", handler.GameQueries[1]);
         Assert.Contains("where id = 202", handler.GameQueries[2]);
+        Assert.Contains("videos.name,videos.video_id", handler.GameQueries[2]);
     }
 
     [Fact]

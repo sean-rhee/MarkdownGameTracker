@@ -57,6 +57,12 @@ public sealed class FrontendTests
         Assert.Contains("data-game-media", detailsHtml);
         Assert.Contains("game-hero-title", detailsHtml);
         Assert.Contains("data-has-hero=\"false\"", detailsHtml);
+        Assert.Contains("data-game-screenshot-viewer", detailsHtml);
+        Assert.Contains("data-screenshot-previous", detailsHtml);
+        Assert.Contains("data-screenshot-next", detailsHtml);
+        Assert.Contains("data-screenshot-counter", detailsHtml);
+        Assert.Contains("data-game-video", detailsHtml);
+        Assert.Contains("data-game-video-frame", detailsHtml);
         Assert.Contains("Choose another match", detailsHtml);
         Assert.Contains("not stored in your note", detailsHtml);
         Assert.Contains("markdown-edit-link", detailsHtml);

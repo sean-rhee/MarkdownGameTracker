@@ -13,7 +13,7 @@ The root page at [`http://localhost:5297/`](http://localhost:5297/) is a respons
 - A day/night theme toggle that follows the device preference and remembers your choice
 - Game details and frontmatter display
 - An IGDB-powered game description on each details page, with a match picker for similarly named games
-- IGDB cover art, wide artwork, and a screenshot gallery for the selected game match
+- IGDB cover art, wide artwork, a screenshot gallery, and the first listed video for the selected game match
 - Formatted Markdown viewing with headings, lists, tables, task lists, links, quotes, and code blocks
 - A split Write/Preview editor with formatting controls and keyboard shortcuts
 - Create and edit forms that write through the same Markdown repository as the API
@@ -73,7 +73,7 @@ $env:IGDB__ClientId = "your-client-id"
 $env:IGDB__ClientSecret = "your-client-secret"
 ```
 
-Opening a game's details page then loads its IGDB description, cover, wide artwork, and up to six screenshots asynchronously. If the automatic match is wrong, **Choose another match** reveals up to ten likely titles with their release years and cover thumbnails. A manual selection is remembered in that browser's local storage, while results are cached in server memory. Neither the description, media URLs, nor any IGDB identifier is added to the Markdown file. Without credentials, the rest of the details page continues to work and shows a setup message in the description panel.
+Opening a game's details page then loads its IGDB description, cover, wide artwork, up to six screenshots, and first listed YouTube video asynchronously. If the automatic match is wrong, **Choose another match** reveals up to ten likely titles with their release years and cover thumbnails. A manual selection is remembered in that browser's local storage, while results are cached in server memory. Neither the description, media URLs, nor any IGDB identifier is added to the Markdown file. Without credentials, the rest of the details page continues to work and shows a setup message in the description panel.
 
 ## Docker
 

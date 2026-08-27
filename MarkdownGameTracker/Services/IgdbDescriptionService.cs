@@ -27,7 +27,8 @@ internal sealed class IgdbDescriptionService(
     private const string DescriptionFields =
         "id,name,summary,storyline,slug,url,first_release_date,"
         + "cover.image_id,artworks.image_id,artworks.width,artworks.height,"
-        + "screenshots.image_id,screenshots.width,screenshots.height";
+        + "screenshots.image_id,screenshots.width,screenshots.height,"
+        + "videos.name,videos.video_id";
     private static readonly TimeSpan MetadataCacheDuration = TimeSpan.FromHours(24);
     private static readonly TimeSpan FailureCacheDuration = TimeSpan.FromMinutes(5);
     private readonly IgdbOptions _options = options.Value;
@@ -44,8 +45,8 @@ internal sealed class IgdbDescriptionService(
 
         var normalizedTitle = title.Trim();
         var cacheKey = igdbGameId is null
-            ? $"igdb-description:title:v2:{normalizedTitle.ToLowerInvariant()}"
-            : $"igdb-description:id:{igdbGameId.Value}";
+            ? $"igdb-description:title:v3:{normalizedTitle.ToLowerInvariant()}"
+            : $"igdb-description:id:v3:{igdbGameId.Value}";
         if (cache.TryGetValue(cacheKey, out IgdbDescriptionResult? cachedResult)
             && cachedResult is not null)
         {
@@ -256,10 +257,17 @@ internal sealed class IgdbDescriptionService(
                 BuildImageUrl(image.ImageId, "screenshot_med_2x")!,
                 BuildImageUrl(image.ImageId, "1080p")!))
             .ToArray();
+        var video = (match.Videos ?? [])
+            .Where(item => IsValidYouTubeVideoId(item.VideoId))
+            .Select(item => new IgdbVideo(
+                string.IsNullOrWhiteSpace(item.Name) ? "Game video" : item.Name.Trim(),
+                $"https://www.youtube-nocookie.com/embed/{item.VideoId}"))
+            .FirstOrDefault();
         if (string.IsNullOrWhiteSpace(description)
             && coverUrl is null
             && heroUrl is null
-            && screenshots.Length == 0)
+            && screenshots.Length == 0
+            && video is null)
         {
             return IgdbDescriptionResult.NotFound();
         }
@@ -271,8 +279,13 @@ internal sealed class IgdbDescriptionService(
             GetSourceUrl(match),
             coverUrl,
             heroUrl,
-            screenshots);
+            screenshots,
+            video);
     }
+
+    private static bool IsValidYouTubeVideoId(string? videoId) =>
+        videoId is { Length: 11 }
+        && videoId.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_');
 
     private static string EscapeSearchText(string value) =>
         value
