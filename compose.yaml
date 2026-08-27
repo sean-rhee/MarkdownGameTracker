@@ -1,0 +1,21 @@
+name: markdown-game-tracker
+
+services:
+  game-tracker:
+    build:
+      context: .
+      dockerfile: MarkdownGameTracker/Dockerfile
+    ports:
+      - "${GAME_TRACKER_PORT:-5297}:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_HTTP_PORTS: 8080
+      Vault__Path: /vault
+      Vault__GamesDirectory: Games
+    volumes:
+      - type: bind
+        source: "${OBSIDIAN_VAULT_PATH:?Set OBSIDIAN_VAULT_PATH in .env}"
+        target: /vault
+        read_only: false
+    init: true
+

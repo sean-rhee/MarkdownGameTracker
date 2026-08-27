@@ -50,24 +50,43 @@ dotnet run --project .\MarkdownGameTracker\MarkdownGameTracker.csproj
 
 ## Docker
 
-The application expects the vault path via the `Vault__Path` environment variable. Mount your Obsidian vault as a volume and set the environment variable:
+Docker needs both pieces of configuration:
 
-```bash
-docker run -e Vault__Path=/vault -v /path/to/vault:/vault -p 5297:5297 markdown-game-tracker
+- A **bind mount** exposes the host's Obsidian vault at `/vault` inside the container.
+- `Vault__Path=/vault` tells the application where to find that mounted directory.
+
+The included `compose.yaml` wires the container side automatically. Copy the example environment file and set the host path:
+
+```powershell
+Copy-Item .env.example .env
 ```
 
-Or with `docker-compose`:
+On Windows with Docker Desktop, `.env` can use forward slashes:
 
-```yaml
-services:
-  game-tracker:
-    image: markdown-game-tracker
-    environment:
-      - Vault__Path=/vault
-    volumes:
-      - /path/to/vault:/vault
-    ports:
-      - "5297:5297"
+```dotenv
+OBSIDIAN_VAULT_PATH=C:/Users/you/path/to/Obsidian/Vault
+GAME_TRACKER_PORT=5297
+```
+
+Then build and start the app:
+
+```powershell
+docker compose up --build
+```
+
+Open [`http://localhost:5297`](http://localhost:5297). The bind mount is read/write because the CRUD interface needs to create and update Markdown files. The local `.env` file is ignored by Git.
+
+The equivalent direct Docker commands are:
+
+```powershell
+docker build -t markdown-game-tracker -f .\MarkdownGameTracker\Dockerfile .
+docker run --rm -p 5297:8080 -e Vault__Path=/vault --mount type=bind,source="C:\path\to\vault",target=/vault markdown-game-tracker
+```
+
+Stop the Compose app with:
+
+```powershell
+docker compose down
 ```
 
 ## Request shape
