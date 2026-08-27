@@ -1,0 +1,59 @@
+@page
+@model MarkdownGameTracker.Pages.Games.CreateModel
+@{
+    ViewData["Title"] = "Add a game";
+}
+
+<div class="page-heading">
+    <div>
+        <a class="back-link" asp-page="/Index">← Back to games</a>
+        <span class="eyebrow">New note</span>
+        <h1>Add a game</h1>
+        <p>Create a Markdown note in your Obsidian Games folder.</p>
+    </div>
+</div>
+
+<div class="form-card editor-form-card">
+    <form method="post">
+        <div asp-validation-summary="ModelOnly" class="validation-summary"></div>
+
+        <div class="form-field">
+            <label asp-for="Input.Title"></label>
+            <input asp-for="Input.Title" class="form-control form-control-lg" autofocus placeholder="e.g. Hollow Knight" />
+            <span asp-validation-for="Input.Title" class="field-validation-error"></span>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label asp-for="Input.Status"></label>
+                <select asp-for="Input.Status" class="form-select">
+                    @foreach (var status in GameStatuses.All)
+                    {
+                        <option value="@status">@GameStatuses.GetLabel(status)</option>
+                    }
+                </select>
+                <span asp-validation-for="Input.Status" class="field-validation-error"></span>
+            </div>
+            <div class="form-field">
+                <label asp-for="Input.Rating"></label>
+                <div class="input-with-suffix">
+                    <input asp-for="Input.Rating" class="form-control" type="number" min="0" max="10" step="0.5" placeholder="—" />
+                    <span>/ 10</span>
+                </div>
+                <span asp-validation-for="Input.Rating" class="field-validation-error"></span>
+            </div>
+        </div>
+
+        <partial name="_MarkdownEditor" for="Input" />
+
+        <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Create game note</button>
+            <a class="btn btn-link" asp-page="/Index">Cancel</a>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/markdown-editor.js" asp-append-version="true"></script>
+}

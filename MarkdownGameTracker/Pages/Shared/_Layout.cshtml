@@ -1,0 +1,92 @@
+@inject IWebHostEnvironment HostEnvironment
+<!DOCTYPE html>
+<html lang="en" data-theme="light" data-bs-theme="light">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta id="themeColor" name="theme-color" content="#b3d9ff" />
+    <title>@ViewData["Title"] · Game Garden</title>
+    <script>
+        (() => {
+            const storedTheme = (() => {
+                try {
+                    return localStorage.getItem("game-garden-theme");
+                }
+                catch {
+                    return null;
+                }
+            })();
+            const theme = storedTheme === "light" || storedTheme === "dark"
+                ? storedTheme
+                : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+
+            document.documentElement.dataset.theme = theme;
+            document.documentElement.setAttribute("data-bs-theme", theme);
+        })();
+    </script>
+    <script type="importmap"></script>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <header class="site-header">
+        <nav class="navbar navbar-expand-md" aria-label="Main navigation">
+            <div class="container">
+                <a class="navbar-brand" asp-page="/Index">
+                    <span class="brand-mark" aria-hidden="true">GG</span>
+                    <span>Game Garden</span>
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavigation"
+                        aria-controls="mainNavigation" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="mainNavigation">
+                    <ul class="navbar-nav ms-auto align-items-md-center gap-md-2">
+                        <li class="nav-item">
+                            <a class="nav-link" asp-page="/Index">My games</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" asp-page="/Games/Create">Add a game</a>
+                        </li>
+                        @if (HostEnvironment.IsDevelopment())
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link" href="/swagger">API docs</a>
+                            </li>
+                        }
+                        <li class="nav-item theme-toggle-item">
+                            <button id="themeToggle" class="nav-link theme-toggle" type="button"
+                                    aria-label="Switch to night mode" title="Switch to night mode">
+                                <svg class="theme-icon theme-icon-moon" aria-hidden="true" viewBox="0 0 24 24">
+                                    <path d="M20.6 15.4A8.5 8.5 0 0 1 8.6 3.4 8.5 8.5 0 1 0 20.6 15.4Z" />
+                                </svg>
+                                <svg class="theme-icon theme-icon-sun" aria-hidden="true" viewBox="0 0 24 24">
+                                    <circle cx="12" cy="12" r="4" />
+                                    <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+                                </svg>
+                                <span class="theme-toggle-text">Night mode</span>
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container page-shell" role="main">
+        @RenderBody()
+    </main>
+
+    <footer class="site-footer">
+        <div class="container d-flex flex-wrap justify-content-between gap-2">
+            <span>Game Garden</span>
+            <span>Powered by your Obsidian vault</span>
+        </div>
+    </footer>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

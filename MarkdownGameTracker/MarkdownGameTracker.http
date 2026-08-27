@@ -1,0 +1,44 @@
+@host = http://localhost:5297
+
+GET {{host}}/api/games
+Accept: application/json
+
+###
+
+GET {{host}}/api/games?status=active
+Accept: application/json
+
+###
+
+GET {{host}}/api/games/Persona%203
+Accept: application/json
+
+###
+
+POST {{host}}/api/games
+Content-Type: application/json
+
+{
+  "title": "Hades II",
+  "status": "planned",
+  "rating": 8.5,
+  "markdown": "## Thoughts\nReady for another run.",
+  "frontmatter": {
+    "platforms": ["PC", "Steam Deck"]
+  }
+}
+
+###
+
+PUT {{host}}/api/games/Hades%20II
+Content-Type: application/json
+
+{
+  "status": "active",
+  "rating": 9,
+  "markdown": "## Thoughts\nOne more run."
+}
+
+###
+
+DELETE {{host}}/api/games/Hades%20II

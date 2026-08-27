@@ -1,0 +1,96 @@
+@page "{id}"
+@model MarkdownGameTracker.Pages.Games.DetailsModel
+@{
+    ViewData["Title"] = Model.Game.Title;
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
+{
+    <div class="alert success-alert" role="status">@Model.SuccessMessage</div>
+}
+
+<div class="note-header">
+    <div>
+        <a class="back-link" asp-page="/Index">← Back to games</a>
+        <div class="note-meta">
+            <span class="status-pill @IndexModel.GetStatusClass(Model.Game.Status)">@(Model.Game.Status is null ? "No status" : GameStatuses.GetLabel(Model.Game.Status))</span>
+            @if (Model.Game.Rating is not null)
+            {
+                <span class="rating-pill">★ @Model.Game.Rating / 10</span>
+            }
+        </div>
+        <h1>@Model.Game.Title</h1>
+        <p class="file-hint">Games/@(Model.Game.Id).md</p>
+    </div>
+    <div class="note-actions">
+        <a class="btn btn-primary" asp-page="/Games/Edit" asp-route-id="@Model.Game.Id">Edit note</a>
+        <button class="btn btn-danger-soft" type="button" data-bs-toggle="modal" data-bs-target="#deleteModal">Delete</button>
+    </div>
+</div>
+
+<div class="note-layout">
+    <article class="note-card">
+        <div class="note-card-heading">
+            <span class="eyebrow">Markdown</span>
+            <span>Stored in Obsidian</span>
+        </div>
+        @if (string.IsNullOrWhiteSpace(Model.Game.Markdown))
+        {
+            <div class="empty-note">
+                <p>This note is empty.</p>
+                <a asp-page="/Games/Edit" asp-route-id="@Model.Game.Id">Add some thoughts →</a>
+            </div>
+        }
+        else
+        {
+            <div class="markdown-body markdown-content">@Html.Raw(Model.RenderedMarkdown)</div>
+        }
+    </article>
+
+    <aside class="metadata-card">
+        <span class="eyebrow">Frontmatter</span>
+        <h2>Note data</h2>
+        <dl>
+            <div>
+                <dt>Type</dt>
+                <dd>game</dd>
+            </div>
+            <div>
+                <dt>Status</dt>
+                <dd>@(Model.Game.Status is null ? "—" : GameStatuses.GetLabel(Model.Game.Status))</dd>
+            </div>
+            <div>
+                <dt>Rating</dt>
+                <dd>@(Model.Game.Rating?.ToString() ?? "—")</dd>
+            </div>
+            @foreach (var item in Model.ExtraFrontmatter)
+            {
+                <div>
+                    <dt>@item.Key</dt>
+                    <dd>@DetailsModel.FormatFrontmatterValue(item.Value)</dd>
+                </div>
+            }
+        </dl>
+        <span class="updated-time">Updated @Model.Game.LastModifiedUtc.ToLocalTime().ToString("MMM d, yyyy · h:mm tt")</span>
+    </aside>
+</div>
+
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content soft-modal">
+            <div class="modal-header">
+                <h2 class="modal-title fs-5" id="deleteModalLabel">Delete @Model.Game.Title?</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                This permanently deletes <strong>@(Model.Game.Id).md</strong> from your vault.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link" data-bs-dismiss="modal">Keep it</button>
+                <form method="post" asp-page-handler="Delete" asp-route-id="@Model.Game.Id">
+                    <button type="submit" class="btn btn-danger">Delete note</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

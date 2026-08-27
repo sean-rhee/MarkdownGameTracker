@@ -1,0 +1,48 @@
+@model MarkdownGameTracker.Pages.Games.GameFormInput
+
+<div class="form-field markdown-workspace" data-markdown-editor data-view="split"
+     data-preview-url="@Url.Content("~/api/markdown/preview")">
+    <div class="markdown-editor-label">
+        <div>
+            <label asp-for="Markdown"></label>
+            <span class="field-help">Use Markdown for headings, lists, links, quotes, code, tables, and task lists.</span>
+        </div>
+        <span class="preview-status" data-preview-status role="status">Live preview</span>
+    </div>
+
+    <div class="markdown-editor-shell">
+        <div class="markdown-toolbar" role="toolbar" aria-label="Markdown formatting">
+            <button class="markdown-tool" type="button" data-markdown-action="heading" aria-label="Heading" title="Heading">
+                H<span>2</span>
+            </button>
+            <button class="markdown-tool" type="button" data-markdown-action="bold" aria-label="Bold" title="Bold (Ctrl+B)">
+                <strong>B</strong>
+            </button>
+            <button class="markdown-tool" type="button" data-markdown-action="italic" aria-label="Italic" title="Italic (Ctrl+I)">
+                <em>I</em>
+            </button>
+            <span class="toolbar-divider" aria-hidden="true"></span>
+            <button class="markdown-tool" type="button" data-markdown-action="quote" aria-label="Block quote" title="Block quote">“</button>
+            <button class="markdown-tool" type="button" data-markdown-action="bulleted-list" aria-label="Bulleted list" title="Bulleted list">• List</button>
+            <button class="markdown-tool" type="button" data-markdown-action="numbered-list" aria-label="Numbered list" title="Numbered list">1. List</button>
+            <button class="markdown-tool" type="button" data-markdown-action="link" aria-label="Link" title="Link (Ctrl+K)">Link</button>
+            <button class="markdown-tool markdown-tool-code" type="button" data-markdown-action="code" aria-label="Code" title="Code">&lt;/&gt;</button>
+
+            <div class="editor-view-switcher" role="group" aria-label="Editor view">
+                <button type="button" data-markdown-view="write" aria-pressed="false">Write</button>
+                <button type="button" data-markdown-view="split" aria-pressed="true">Split</button>
+                <button type="button" data-markdown-view="preview" aria-pressed="false">Preview</button>
+            </div>
+        </div>
+
+        <div class="markdown-editor-grid">
+            <div class="markdown-write-pane" data-markdown-pane="write">
+                <textarea asp-for="Markdown" class="markdown-editor" rows="18" spellcheck="true"></textarea>
+            </div>
+            <div class="markdown-preview-pane markdown-content" data-markdown-pane="preview" aria-live="polite">
+                <p class="preview-placeholder">Your formatted preview will appear here.</p>
+            </div>
+        </div>
+    </div>
+    <span asp-validation-for="Markdown" class="field-validation-error"></span>
+</div>

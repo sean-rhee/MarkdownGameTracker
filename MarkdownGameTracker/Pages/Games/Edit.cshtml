@@ -1,0 +1,60 @@
+@page "{id}"
+@model MarkdownGameTracker.Pages.Games.EditModel
+@{
+    ViewData["Title"] = $"Edit {Model.Input.Title}";
+}
+
+<div class="page-heading">
+    <div>
+        <a class="back-link" asp-page="/Games/Details" asp-route-id="@Model.OriginalId">← Back to note</a>
+        <span class="eyebrow">Edit note</span>
+        <h1>@Model.Input.Title</h1>
+        <p>Changes are written directly to the Markdown file.</p>
+    </div>
+</div>
+
+<div class="form-card editor-form-card">
+    <form method="post">
+        <div asp-validation-summary="ModelOnly" class="validation-summary"></div>
+
+        <div class="form-field">
+            <label asp-for="Input.Title"></label>
+            <input asp-for="Input.Title" class="form-control form-control-lg" />
+            <span asp-validation-for="Input.Title" class="field-validation-error"></span>
+            <span class="field-help">Changing the title renames the note file.</span>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label asp-for="Input.Status"></label>
+                <select asp-for="Input.Status" class="form-select">
+                    @foreach (var status in GameStatuses.All)
+                    {
+                        <option value="@status">@GameStatuses.GetLabel(status)</option>
+                    }
+                </select>
+                <span asp-validation-for="Input.Status" class="field-validation-error"></span>
+            </div>
+            <div class="form-field">
+                <label asp-for="Input.Rating"></label>
+                <div class="input-with-suffix">
+                    <input asp-for="Input.Rating" class="form-control" type="number" min="0" max="10" step="0.5" />
+                    <span>/ 10</span>
+                </div>
+                <span asp-validation-for="Input.Rating" class="field-validation-error"></span>
+            </div>
+        </div>
+
+        <partial name="_MarkdownEditor" for="Input" />
+
+        <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Save changes</button>
+            <a class="btn btn-link" asp-page="/Games/Details" asp-route-id="@Model.OriginalId">Cancel</a>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/markdown-editor.js" asp-append-version="true"></script>
+}

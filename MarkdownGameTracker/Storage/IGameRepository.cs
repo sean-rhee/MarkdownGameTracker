@@ -1,0 +1,25 @@
+using MarkdownGameTracker.Models;
+
+namespace MarkdownGameTracker.Storage;
+
+public interface IGameRepository
+{
+    Task<IReadOnlyList<GameNote>> ListAsync(
+        string? status,
+        string? search,
+        CancellationToken cancellationToken);
+
+    Task<GameNote?> GetAsync(string id, CancellationToken cancellationToken);
+
+    Task<GameNote> CreateAsync(CreateGameRequest request, CancellationToken cancellationToken);
+
+    Task<GameNote?> UpdateAsync(
+        string id,
+        UpdateGameRequest request,
+        CancellationToken cancellationToken);
+
+    Task<bool> DeleteAsync(string id, CancellationToken cancellationToken);
+}
+
+public sealed class GameAlreadyExistsException(string title)
+    : Exception($"A game note named '{title}' already exists.");

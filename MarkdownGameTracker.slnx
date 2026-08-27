@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="MarkdownGameTracker/MarkdownGameTracker.csproj" />
+  <Project Path="MarkdownGameTracker.Tests/MarkdownGameTracker.Tests.csproj" />
+</Solution>

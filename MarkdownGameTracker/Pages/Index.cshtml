@@ -1,0 +1,120 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "My games";
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
+{
+    <div class="alert success-alert" role="status">@Model.SuccessMessage</div>
+}
+
+<section class="hero-panel">
+    <div>
+        <span class="eyebrow">Your personal game journal</span>
+        <h1>What are you playing?</h1>
+        <p>Track the backlog, remember where you left off, and keep every thought in Markdown.</p>
+    </div>
+    <a class="btn btn-primary btn-lg" asp-page="/Games/Create">+ Add a game</a>
+</section>
+
+<section class="library-section">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">The library</span>
+            <h2>Game notes</h2>
+        </div>
+        <span class="result-count">@Model.Games.Count @(Model.Games.Count == 1 ? "result" : "results")</span>
+    </div>
+
+    <nav class="status-tabs" aria-label="Game status">
+        @foreach (var tab in Model.StatusTabs)
+        {
+            <a class="status-tab @(tab.Value == Model.SelectedStatus ? "active" : null)"
+               asp-page="/Index"
+               asp-route-status="@tab.Value"
+               asp-route-search="@Model.Search"
+               aria-current="@(tab.Value == Model.SelectedStatus ? "page" : null)">
+                <span>@tab.Label</span>
+                <span class="status-tab-count">@tab.Count</span>
+            </a>
+        }
+    </nav>
+
+    <form method="get" class="filter-bar">
+        <input asp-for="Status" type="hidden" />
+        <div class="filter-field filter-search">
+            <label asp-for="Search">Search</label>
+            <input asp-for="Search" class="form-control" placeholder="Title or notes…" />
+        </div>
+        <button class="btn btn-secondary" type="submit">Search</button>
+        @if (!string.IsNullOrWhiteSpace(Model.Search))
+        {
+            <a class="btn btn-link" asp-page="/Index" asp-route-status="@Model.SelectedStatus">Clear</a>
+        }
+    </form>
+
+    @if (Model.Games.Count == 0)
+    {
+        <div class="empty-state">
+            <div class="empty-icon" aria-hidden="true">✦</div>
+            <h3>No @GameStatuses.GetLabel(Model.SelectedStatus).ToLowerInvariant() games found</h3>
+            <p>Try clearing the search or add a game to this list.</p>
+            <a class="btn btn-primary" asp-page="/Games/Create">Add a game</a>
+        </div>
+    }
+    else
+    {
+        <div class="game-grid">
+            @foreach (var game in Model.Games)
+            {
+                <article class="game-card">
+                    <div class="game-card-top">
+                        <div class="dropdown status-dropdown">
+                            <button class="status-pill status-button @IndexModel.GetStatusClass(game.Status) dropdown-toggle"
+                                    type="button"
+                                    data-bs-toggle="dropdown"
+                                    aria-expanded="false"
+                                    aria-label="Change status for @game.Title">
+                                @(game.Status is null ? "No status" : GameStatuses.GetLabel(game.Status))
+                            </button>
+                            <div class="dropdown-menu status-menu">
+                                <span class="dropdown-header">Move to</span>
+                                @foreach (var status in GameStatuses.All)
+                                {
+                                    var isCurrentStatus = string.Equals(game.Status, status, StringComparison.OrdinalIgnoreCase);
+                                    <form method="post" asp-page-handler="ChangeStatus" class="status-menu-form">
+                                        <input type="hidden" name="id" value="@game.Id" />
+                                        <input type="hidden" name="status" value="@status" />
+                                        <input type="hidden" name="currentStatus" value="@Model.SelectedStatus" />
+                                        <input type="hidden" name="search" value="@Model.Search" />
+                                        <button class="dropdown-item status-option @(isCurrentStatus ? "current" : null)"
+                                                type="submit"
+                                                disabled="@(isCurrentStatus ? "disabled" : null)">
+                                            <span class="status-option-dot @IndexModel.GetStatusClass(status)" aria-hidden="true"></span>
+                                            <span>@GameStatuses.GetLabel(status)</span>
+                                            @if (isCurrentStatus)
+                                            {
+                                                <span class="status-check" aria-hidden="true">✓</span>
+                                            }
+                                        </button>
+                                    </form>
+                                }
+                            </div>
+                        </div>
+                        @if (game.Rating is not null)
+                        {
+                            <span class="rating-pill" aria-label="Rating @game.Rating out of 10">★ @game.Rating</span>
+                        }
+                    </div>
+                    <h3>@game.Title</h3>
+                    <p>@IndexModel.GetExcerpt(game.Markdown)</p>
+                    <div class="game-card-actions">
+                        <a class="stretched-link" asp-page="/Games/Details" asp-route-id="@game.Id">Open note</a>
+                        <span aria-hidden="true">→</span>
+                    </div>
+                </article>
+            }
+        </div>
+    }
+</section>
