@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using MarkdownGameTracker.Models;
@@ -9,7 +10,10 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace MarkdownGameTracker.Tests;
@@ -45,6 +49,7 @@ public sealed class GameApiTests
         Assert.Contains("#b3d9ff", homeHtml, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("<h2", detailsHtml);
         Assert.Contains("data-game-description", detailsHtml);
+        Assert.Contains("Choose another match", detailsHtml);
         Assert.Contains("not stored in your note", detailsHtml);
         Assert.Contains("<strong>lovely</strong>", detailsHtml);
         Assert.DoesNotContain("<script>alert('nope')</script>", detailsHtml, StringComparison.OrdinalIgnoreCase);
@@ -124,6 +129,7 @@ public sealed class GameApiTests
         Assert.True(paths.GetProperty("/api/games/{id}").TryGetProperty("put", out _));
         Assert.True(paths.GetProperty("/api/games/{id}").TryGetProperty("delete", out _));
         Assert.True(paths.GetProperty("/api/games/{id}/igdb-description").TryGetProperty("get", out _));
+        Assert.True(paths.GetProperty("/api/games/{id}/igdb-matches").TryGetProperty("get", out _));
         Assert.True(paths.GetProperty("/api/markdown/preview").TryGetProperty("post", out _));
 
         var swaggerHtml = await swaggerResponse.Content.ReadAsStringAsync();
@@ -140,17 +146,62 @@ public sealed class GameApiTests
         var detailsHtml = await app.Client.GetStringAsync("/Games/Details/Metadata%20Game");
         var result = await app.Client.GetFromJsonAsync<IgdbDescriptionResult>(
             "/api/games/Metadata%20Game/igdb-description");
+        var matches = await app.Client.GetFromJsonAsync<IgdbMatchSearchResult>(
+            "/api/games/Metadata%20Game/igdb-matches");
+        var selectedResult = await app.Client.GetFromJsonAsync<IgdbDescriptionResult>(
+            "/api/games/Metadata%20Game/igdb-description?igdbId=202");
 
         Assert.Contains("/api/games/Metadata%20Game/igdb-description", detailsHtml);
+        Assert.Contains("/api/games/Metadata%20Game/igdb-matches", detailsHtml);
         Assert.DoesNotContain("Metadata Game is a fetched description.", detailsHtml);
         Assert.NotNull(result);
         Assert.Equal(IgdbDescriptionResult.AvailableStatus, result.Status);
         Assert.Equal("Metadata Game is a fetched description.", result.Description);
         Assert.Equal("Metadata Game", result.MatchedTitle);
+        Assert.Equal(101, result.IgdbGameId);
+        Assert.NotNull(matches);
+        Assert.Equal(2, matches.Matches.Count);
+        Assert.Equal("Metadata Game Remastered", matches.Matches[1].Title);
+        Assert.Equal(2024, matches.Matches[1].ReleaseYear);
+        Assert.NotNull(selectedResult);
+        Assert.Equal(202, selectedResult.IgdbGameId);
+        Assert.Equal("Metadata Game Remastered", selectedResult.MatchedTitle);
+        Assert.Equal("The remastered description.", selectedResult.Description);
         Assert.Equal(originalNote, await File.ReadAllTextAsync(app.GamePath("Metadata Game")));
 
         var missingResponse = await app.Client.GetAsync("/api/games/Missing/igdb-description");
         Assert.Equal(HttpStatusCode.NotFound, missingResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task Igdb_service_searches_candidates_and_loads_the_selected_game_id()
+    {
+        using var handler = new FakeIgdbHttpHandler();
+        using var client = new HttpClient(handler);
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var service = new IgdbDescriptionService(
+            client,
+            Options.Create(new IgdbOptions
+            {
+                ClientId = "test-client-id",
+                ClientSecret = "test-client-secret"
+            }),
+            cache,
+            NullLogger<IgdbDescriptionService>.Instance);
+
+        var matches = await service.SearchMatchesAsync("Metadata Game", CancellationToken.None);
+        var description = await service.GetDescriptionAsync("Metadata Game", 202, CancellationToken.None);
+
+        Assert.Equal(IgdbDescriptionResult.AvailableStatus, matches.Status);
+        Assert.Equal(2, matches.Matches.Count);
+        Assert.Equal(2024, matches.Matches[1].ReleaseYear);
+        Assert.Equal(202, description.IgdbGameId);
+        Assert.Equal("Metadata Game Remastered", description.MatchedTitle);
+        Assert.Equal("The exact selected description.", description.Description);
+        Assert.Equal(1, handler.TokenRequestCount);
+        Assert.Equal(2, handler.GameQueries.Count);
+        Assert.Contains("search \"Metadata Game\"", handler.GameQueries[0]);
+        Assert.Contains("where id = 202", handler.GameQueries[1]);
     }
 
     [Fact]
@@ -328,10 +379,83 @@ public sealed class GameApiTests
     {
         public Task<IgdbDescriptionResult> GetDescriptionAsync(
             string title,
+            long? igdbGameId,
             CancellationToken cancellationToken) =>
-            Task.FromResult(IgdbDescriptionResult.Available(
-                $"{title} is a fetched description.",
-                title,
-                "https://www.igdb.com/games/metadata-game"));
+            Task.FromResult(igdbGameId == 202
+                ? IgdbDescriptionResult.Available(
+                    202,
+                    "The remastered description.",
+                    "Metadata Game Remastered",
+                    "https://www.igdb.com/games/metadata-game-remastered")
+                : IgdbDescriptionResult.Available(
+                    101,
+                    $"{title} is a fetched description.",
+                    title,
+                    "https://www.igdb.com/games/metadata-game"));
+
+        public Task<IgdbMatchSearchResult> SearchMatchesAsync(
+            string title,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(IgdbMatchSearchResult.Available(
+            [
+                new IgdbGameMatch(
+                    101,
+                    title,
+                    2020,
+                    "https://www.igdb.com/games/metadata-game"),
+                new IgdbGameMatch(
+                    202,
+                    $"{title} Remastered",
+                    2024,
+                    "https://www.igdb.com/games/metadata-game-remastered")
+            ]));
+    }
+
+    private sealed class FakeIgdbHttpHandler : HttpMessageHandler
+    {
+        public int TokenRequestCount { get; private set; }
+
+        public List<string> GameQueries { get; } = [];
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            if (request.RequestUri?.Host == "id.twitch.tv")
+            {
+                TokenRequestCount++;
+                var tokenForm = await request.Content!.ReadAsStringAsync(cancellationToken);
+                Assert.Contains("client_id=test-client-id", tokenForm);
+                Assert.Contains("client_secret=test-client-secret", tokenForm);
+                Assert.Contains("grant_type=client_credentials", tokenForm);
+                return JsonResponse("""
+                    {"access_token":"test-access-token","expires_in":3600,"token_type":"bearer"}
+                    """);
+            }
+
+            Assert.Equal("api.igdb.com", request.RequestUri?.Host);
+            Assert.Equal("test-client-id", request.Headers.GetValues("Client-ID").Single());
+            Assert.Equal("Bearer", request.Headers.Authorization?.Scheme);
+            Assert.Equal("test-access-token", request.Headers.Authorization?.Parameter);
+            var query = await request.Content!.ReadAsStringAsync(cancellationToken);
+            GameQueries.Add(query);
+
+            return query.Contains("where id = 202", StringComparison.Ordinal)
+                ? JsonResponse("""
+                    [{"id":202,"name":"Metadata Game Remastered","summary":"The exact selected description.","slug":"metadata-game-remastered"}]
+                    """)
+                : JsonResponse("""
+                    [
+                      {"id":101,"name":"Metadata Game","first_release_date":1577836800,"slug":"metadata-game"},
+                      {"id":202,"name":"Metadata Game Remastered","first_release_date":1704067200,"slug":"metadata-game-remastered"}
+                    ]
+                    """);
+        }
+
+        private static HttpResponseMessage JsonResponse(string json) =>
+            new(HttpStatusCode.OK)
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json")
+            };
     }
 }

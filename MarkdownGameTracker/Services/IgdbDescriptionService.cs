@@ -11,7 +11,14 @@ namespace MarkdownGameTracker.Services;
 
 public interface IIgdbDescriptionService
 {
-    Task<IgdbDescriptionResult> GetDescriptionAsync(string title, CancellationToken cancellationToken);
+    Task<IgdbDescriptionResult> GetDescriptionAsync(
+        string title,
+        long? igdbGameId,
+        CancellationToken cancellationToken);
+
+    Task<IgdbMatchSearchResult> SearchMatchesAsync(
+        string title,
+        CancellationToken cancellationToken);
 }
 
 public sealed class IgdbDescriptionService(
@@ -20,7 +27,7 @@ public sealed class IgdbDescriptionService(
     IMemoryCache cache,
     ILogger<IgdbDescriptionService> logger) : IIgdbDescriptionService
 {
-    private static readonly TimeSpan DescriptionCacheDuration = TimeSpan.FromHours(24);
+    private static readonly TimeSpan MetadataCacheDuration = TimeSpan.FromHours(24);
     private static readonly TimeSpan FailureCacheDuration = TimeSpan.FromMinutes(5);
     private readonly IgdbOptions _options = options.Value;
     private readonly SemaphoreSlim _tokenLock = new(1, 1);
@@ -28,6 +35,7 @@ public sealed class IgdbDescriptionService(
 
     public async Task<IgdbDescriptionResult> GetDescriptionAsync(
         string title,
+        long? igdbGameId,
         CancellationToken cancellationToken)
     {
         if (!_options.IsConfigured)
@@ -36,35 +44,110 @@ public sealed class IgdbDescriptionService(
         }
 
         var normalizedTitle = title.Trim();
-        var cacheKey = $"igdb-description:{normalizedTitle.ToLowerInvariant()}";
+        var cacheKey = igdbGameId is null
+            ? $"igdb-description:title:{normalizedTitle.ToLowerInvariant()}"
+            : $"igdb-description:id:{igdbGameId.Value}";
         if (cache.TryGetValue(cacheKey, out IgdbDescriptionResult? cachedResult)
             && cachedResult is not null)
         {
             return cachedResult;
         }
 
-        var result = await LookupDescriptionAsync(normalizedTitle, cancellationToken);
+        var result = await LookupDescriptionAsync(normalizedTitle, igdbGameId, cancellationToken);
         cache.Set(
             cacheKey,
             result,
-            result.Status is IgdbDescriptionResult.AvailableStatus or IgdbDescriptionResult.NotFoundStatus
-                ? DescriptionCacheDuration
-                : FailureCacheDuration);
+            IsStableStatus(result.Status) ? MetadataCacheDuration : FailureCacheDuration);
+        return result;
+    }
+
+    public async Task<IgdbMatchSearchResult> SearchMatchesAsync(
+        string title,
+        CancellationToken cancellationToken)
+    {
+        if (!_options.IsConfigured)
+        {
+            return IgdbMatchSearchResult.NotConfigured();
+        }
+
+        var normalizedTitle = title.Trim();
+        var cacheKey = $"igdb-matches:{normalizedTitle.ToLowerInvariant()}";
+        if (cache.TryGetValue(cacheKey, out IgdbMatchSearchResult? cachedResult)
+            && cachedResult is not null)
+        {
+            return cachedResult;
+        }
+
+        var query = $"search \"{EscapeSearchText(normalizedTitle)}\"; "
+                    + "fields id,name,first_release_date,slug,url; limit 10;";
+        var queryResult = await QueryGamesAsync(normalizedTitle, query, cancellationToken);
+        var result = !queryResult.Succeeded
+            ? IgdbMatchSearchResult.Unavailable()
+            : queryResult.Games.Length == 0
+                ? IgdbMatchSearchResult.NotFound()
+                : IgdbMatchSearchResult.Available(queryResult.Games.Select(ToMatch).ToArray());
+
+        cache.Set(
+            cacheKey,
+            result,
+            IsStableStatus(result.Status) ? MetadataCacheDuration : FailureCacheDuration);
         return result;
     }
 
     private async Task<IgdbDescriptionResult> LookupDescriptionAsync(
         string title,
+        long? igdbGameId,
+        CancellationToken cancellationToken)
+    {
+        var query = igdbGameId is null
+            ? $"search \"{EscapeSearchText(title)}\"; "
+              + "fields id,name,summary,storyline,slug,url,first_release_date; limit 10;"
+            : $"fields id,name,summary,storyline,slug,url,first_release_date; "
+              + $"where id = {igdbGameId.Value}; limit 1;";
+        var queryResult = await QueryGamesAsync(title, query, cancellationToken);
+        if (!queryResult.Succeeded)
+        {
+            return IgdbDescriptionResult.Unavailable();
+        }
+
+        var match = igdbGameId is null
+            ? queryResult.Games.FirstOrDefault(game =>
+                  string.Equals(game.Name, title, StringComparison.OrdinalIgnoreCase))
+              ?? queryResult.Games.FirstOrDefault()
+            : queryResult.Games.FirstOrDefault();
+        if (match is null)
+        {
+            return IgdbDescriptionResult.NotFound();
+        }
+
+        var description = !string.IsNullOrWhiteSpace(match.Summary)
+            ? match.Summary
+            : match.Storyline;
+        if (string.IsNullOrWhiteSpace(description))
+        {
+            return IgdbDescriptionResult.NotFound();
+        }
+
+        return IgdbDescriptionResult.Available(
+            match.Id,
+            description.Trim(),
+            match.Name,
+            GetSourceUrl(match));
+    }
+
+    private async Task<IgdbQueryResult> QueryGamesAsync(
+        string title,
+        string query,
         CancellationToken cancellationToken)
     {
         try
         {
-            var response = await SearchGamesAsync(title, refreshToken: false, cancellationToken);
+            var response = await SendGamesQueryAsync(query, refreshToken: false, cancellationToken);
             if (response.StatusCode == HttpStatusCode.Unauthorized)
             {
                 _accessToken = null;
                 response.Dispose();
-                response = await SearchGamesAsync(title, refreshToken: true, cancellationToken);
+                response = await SendGamesQueryAsync(query, refreshToken: true, cancellationToken);
             }
 
             using (response)
@@ -74,63 +157,37 @@ public sealed class IgdbDescriptionService(
                     logger.LogWarning(
                         "IGDB game lookup failed with status code {StatusCode}.",
                         response.StatusCode);
-                    return IgdbDescriptionResult.Unavailable();
+                    return IgdbQueryResult.Failed();
                 }
 
                 var games = await response.Content.ReadFromJsonAsync<IgdbGame[]>(cancellationToken)
                     ?? [];
-                var match = games.FirstOrDefault(game =>
-                                string.Equals(game.Name, title, StringComparison.OrdinalIgnoreCase))
-                            ?? games.FirstOrDefault();
-
-                if (match is null)
-                {
-                    return IgdbDescriptionResult.NotFound();
-                }
-
-                var description = !string.IsNullOrWhiteSpace(match.Summary)
-                    ? match.Summary
-                    : match.Storyline;
-                if (string.IsNullOrWhiteSpace(description))
-                {
-                    return IgdbDescriptionResult.NotFound();
-                }
-
-                var sourceUrl = GetSourceUrl(match);
-
-                return IgdbDescriptionResult.Available(
-                    description.Trim(),
-                    match.Name,
-                    sourceUrl);
+                return IgdbQueryResult.Success(games);
             }
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             logger.LogWarning("IGDB game lookup timed out for {GameTitle}.", title);
-            return IgdbDescriptionResult.Unavailable();
+            return IgdbQueryResult.Failed();
         }
         catch (HttpRequestException exception)
         {
             logger.LogWarning(exception, "IGDB game lookup failed for {GameTitle}.", title);
-            return IgdbDescriptionResult.Unavailable();
+            return IgdbQueryResult.Failed();
         }
         catch (JsonException exception)
         {
             logger.LogWarning(exception, "IGDB returned an invalid response for {GameTitle}.", title);
-            return IgdbDescriptionResult.Unavailable();
+            return IgdbQueryResult.Failed();
         }
     }
 
-    private async Task<HttpResponseMessage> SearchGamesAsync(
-        string title,
+    private async Task<HttpResponseMessage> SendGamesQueryAsync(
+        string query,
         bool refreshToken,
         CancellationToken cancellationToken)
     {
         var token = await GetAccessTokenAsync(refreshToken, cancellationToken);
-        var escapedTitle = title
-            .Replace("\\", "\\\\", StringComparison.Ordinal)
-            .Replace("\"", "\\\"", StringComparison.Ordinal);
-        var query = $"search \"{escapedTitle}\"; fields name,summary,storyline,slug,url; limit 10;";
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.igdb.com/v4/games")
         {
             Content = new StringContent(query, Encoding.UTF8, "text/plain")
@@ -183,6 +240,34 @@ public sealed class IgdbDescriptionService(
         }
     }
 
+    private static string EscapeSearchText(string value) =>
+        value
+            .Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("\"", "\\\"", StringComparison.Ordinal);
+
+    private static bool IsStableStatus(string status) =>
+        status is IgdbDescriptionResult.AvailableStatus or IgdbDescriptionResult.NotFoundStatus;
+
+    private static IgdbGameMatch ToMatch(IgdbGame game) =>
+        new(game.Id, game.Name, GetReleaseYear(game.FirstReleaseDate), GetSourceUrl(game));
+
+    private static int? GetReleaseYear(long? timestamp)
+    {
+        if (timestamp is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return DateTimeOffset.FromUnixTimeSeconds(timestamp.Value).Year;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return null;
+        }
+    }
+
     private static string GetSourceUrl(IgdbGame game)
     {
         if (Uri.TryCreate(game.Url, UriKind.Absolute, out var sourceUri)
@@ -205,15 +290,25 @@ public sealed class IgdbDescriptionService(
         [property: JsonPropertyName("expires_in")] int ExpiresIn);
 
     private sealed record IgdbGame(
+        [property: JsonPropertyName("id")] long Id,
         [property: JsonPropertyName("name")] string Name,
         [property: JsonPropertyName("summary")] string? Summary,
         [property: JsonPropertyName("storyline")] string? Storyline,
         [property: JsonPropertyName("slug")] string? Slug,
-        [property: JsonPropertyName("url")] string? Url);
+        [property: JsonPropertyName("url")] string? Url,
+        [property: JsonPropertyName("first_release_date")] long? FirstReleaseDate);
+
+    private sealed record IgdbQueryResult(bool Succeeded, IgdbGame[] Games)
+    {
+        public static IgdbQueryResult Success(IgdbGame[] games) => new(true, games);
+
+        public static IgdbQueryResult Failed() => new(false, []);
+    }
 }
 
 public sealed record IgdbDescriptionResult(
     string Status,
+    long? IgdbGameId,
     string? Description,
     string? MatchedTitle,
     string? SourceUrl)
@@ -223,15 +318,40 @@ public sealed record IgdbDescriptionResult(
     public const string NotFoundStatus = "notFound";
     public const string UnavailableStatus = "unavailable";
 
-    public static IgdbDescriptionResult Available(string description, string matchedTitle, string sourceUrl) =>
-        new(AvailableStatus, description, matchedTitle, sourceUrl);
+    public static IgdbDescriptionResult Available(
+        long igdbGameId,
+        string description,
+        string matchedTitle,
+        string sourceUrl) =>
+        new(AvailableStatus, igdbGameId, description, matchedTitle, sourceUrl);
 
     public static IgdbDescriptionResult NotConfigured() =>
-        new(NotConfiguredStatus, null, null, null);
+        new(NotConfiguredStatus, null, null, null, null);
 
     public static IgdbDescriptionResult NotFound() =>
-        new(NotFoundStatus, null, null, null);
+        new(NotFoundStatus, null, null, null, null);
 
     public static IgdbDescriptionResult Unavailable() =>
-        new(UnavailableStatus, null, null, null);
+        new(UnavailableStatus, null, null, null, null);
+}
+
+public sealed record IgdbGameMatch(
+    long IgdbGameId,
+    string Title,
+    int? ReleaseYear,
+    string SourceUrl);
+
+public sealed record IgdbMatchSearchResult(string Status, IReadOnlyList<IgdbGameMatch> Matches)
+{
+    public static IgdbMatchSearchResult Available(IReadOnlyList<IgdbGameMatch> matches) =>
+        new(IgdbDescriptionResult.AvailableStatus, matches);
+
+    public static IgdbMatchSearchResult NotConfigured() =>
+        new(IgdbDescriptionResult.NotConfiguredStatus, []);
+
+    public static IgdbMatchSearchResult NotFound() =>
+        new(IgdbDescriptionResult.NotFoundStatus, []);
+
+    public static IgdbMatchSearchResult Unavailable() =>
+        new(IgdbDescriptionResult.UnavailableStatus, []);
 }

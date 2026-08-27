@@ -12,7 +12,7 @@ The root page at [`http://localhost:5297/`](http://localhost:5297/) is a respons
 - Clickable status badges for moving a game between statuses directly from its card
 - A day/night theme toggle that follows the device preference and remembers your choice
 - Game details and frontmatter display
-- An IGDB-powered game description on each details page, fetched separately and never written into the note
+- An IGDB-powered game description on each details page, with a match picker for similarly named games
 - Formatted Markdown viewing with headings, lists, tables, task lists, links, quotes, and code blocks
 - A split Write/Preview editor with formatting controls and keyboard shortcuts
 - Create and edit forms that write through the same Markdown repository as the API
@@ -30,6 +30,7 @@ In development, interactive Swagger documentation is available at [`/swagger`](h
 | `GET` | `/api/games?status=active&search=term` | List, filter, and search games |
 | `GET` | `/api/games/{id}` | Read one game by filename without `.md` |
 | `GET` | `/api/games/{id}/igdb-description` | Fetch a read-only game description from IGDB |
+| `GET` | `/api/games/{id}/igdb-matches` | Find likely IGDB titles and release years |
 | `POST` | `/api/games` | Create a game note |
 | `PUT` | `/api/games/{id}` | Update fields or rename a game note |
 | `DELETE` | `/api/games/{id}` | Permanently delete a game note |
@@ -61,7 +62,7 @@ $env:IGDB__ClientId = "your-client-id"
 $env:IGDB__ClientSecret = "your-client-secret"
 ```
 
-Opening a game's details page then loads its IGDB description asynchronously. Results are cached in memory, and neither the description nor any IGDB identifier is added to the Markdown file. Without credentials, the rest of the details page continues to work and shows a setup message in the description panel.
+Opening a game's details page then loads its IGDB description asynchronously. If the automatic match is wrong, **Choose another match** reveals up to ten likely titles with their release years. A manual selection is remembered in that browser's local storage, while results are cached in server memory. Neither the description nor any IGDB identifier is added to the Markdown file. Without credentials, the rest of the details page continues to work and shows a setup message in the description panel.
 
 ## Docker
 

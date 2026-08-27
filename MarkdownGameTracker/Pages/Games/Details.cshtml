@@ -31,7 +31,9 @@
 <section class="game-description-card"
          aria-labelledby="gameDescriptionHeading"
          data-game-description
-         data-description-url="/api/games/@Uri.EscapeDataString(Model.Game.Id)/igdb-description">
+         data-game-id="@Model.Game.Id"
+         data-description-url="/api/games/@Uri.EscapeDataString(Model.Game.Id)/igdb-description"
+         data-matches-url="/api/games/@Uri.EscapeDataString(Model.Game.Id)/igdb-matches">
     <div class="game-description-heading">
         <div>
             <span class="eyebrow">Game overview</span>
@@ -44,7 +46,27 @@
     </div>
     <div class="game-description-footer" data-description-footer hidden>
         <span data-description-match>Fetched live · not stored in your note</span>
-        <a data-description-source target="_blank" rel="noopener noreferrer">View on IGDB ↗</a>
+        <div class="game-description-actions">
+            <button class="igdb-match-toggle"
+                    type="button"
+                    aria-expanded="false"
+                    aria-controls="igdbMatchPicker"
+                    data-match-toggle
+                    hidden>
+                Choose another match
+            </button>
+            <a data-description-source target="_blank" rel="noopener noreferrer" hidden>View on IGDB ↗</a>
+        </div>
+    </div>
+    <div class="igdb-match-picker" id="igdbMatchPicker" data-match-picker hidden>
+        <div class="igdb-match-picker-heading">
+            <div>
+                <span class="eyebrow">IGDB search</span>
+                <h3>Choose the right game</h3>
+            </div>
+            <span>Release years help distinguish remakes and similarly named games.</span>
+        </div>
+        <div class="igdb-match-list" data-match-list role="status" aria-live="polite"></div>
     </div>
 </section>
 

@@ -1015,6 +1015,114 @@ html[data-theme="dark"] .theme-icon-sun {
   text-decoration: none;
 }
 
+.game-description-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.igdb-match-toggle {
+  padding: 0;
+  color: #266fae;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+}
+
+.igdb-match-toggle:hover,
+.igdb-match-toggle:focus-visible {
+  color: #174f81;
+  text-decoration: underline;
+}
+
+.igdb-match-picker {
+  margin-top: 1.15rem;
+  padding-top: 1.15rem;
+  border-top: 1px solid var(--border);
+}
+
+.igdb-match-picker-heading {
+  margin-bottom: 0.85rem;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.igdb-match-picker-heading .eyebrow {
+  margin-bottom: 0.3rem;
+}
+
+.igdb-match-picker-heading h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.igdb-match-picker-heading > span {
+  max-width: 420px;
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+  text-align: right;
+}
+
+.igdb-match-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.igdb-match-option {
+  min-width: 0;
+  padding: 0.75rem 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.62);
+  text-align: left;
+}
+
+.igdb-match-option:hover,
+.igdb-match-option:focus-visible,
+.igdb-match-option[aria-current="true"] {
+  border-color: var(--blue-400);
+  background: var(--blue-100);
+}
+
+.igdb-match-option:focus-visible {
+  outline: 3px solid rgba(57, 127, 189, 0.32);
+  outline-offset: 2px;
+}
+
+.igdb-match-title {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.84rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.igdb-match-year {
+  flex: 0 0 auto;
+  color: var(--ink-soft);
+  font-size: 0.74rem;
+}
+
+.igdb-match-message {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 0.8rem;
+  color: var(--ink-soft);
+  border-radius: 10px;
+  background: var(--blue-100);
+  font-size: 0.82rem;
+}
+
 .note-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 290px;
@@ -1422,6 +1530,20 @@ html[data-theme="dark"] .igdb-badge {
   background: rgba(36, 70, 95, 0.8);
 }
 
+html[data-theme="dark"] .igdb-match-toggle {
+  color: #8fc8f2;
+}
+
+html[data-theme="dark"] .igdb-match-option {
+  background: rgba(23, 43, 62, 0.7);
+}
+
+html[data-theme="dark"] .igdb-match-option:hover,
+html[data-theme="dark"] .igdb-match-option:focus-visible,
+html[data-theme="dark"] .igdb-match-option[aria-current="true"] {
+  background: var(--blue-100);
+}
+
 html[data-theme="dark"] .metadata-card dl div {
   border-bottom-color: #29465d;
 }
@@ -1557,6 +1679,21 @@ a:focus-visible {
   .game-description-footer {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .game-description-actions,
+  .igdb-match-picker-heading {
+    width: 100%;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .igdb-match-picker-heading > span {
+    text-align: left;
+  }
+
+  .igdb-match-list {
+    grid-template-columns: 1fr;
   }
 
   .site-footer .container {
