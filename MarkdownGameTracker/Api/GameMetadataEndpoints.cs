@@ -93,6 +93,59 @@ public static class GameMetadataEndpoints
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesValidationProblem();
 
+        endpoints.MapPost(
+                "/api/games/igdb-card-artwork",
+                async (
+                    GameArtworkBatchRequest request,
+                    IGameRepository repository,
+                    IIgdbDescriptionService igdb,
+                    CancellationToken cancellationToken) =>
+                {
+                    var selections = request.Games?
+                        .Where(game => !string.IsNullOrWhiteSpace(game.Id))
+                        .DistinctBy(game => game.Id, StringComparer.OrdinalIgnoreCase)
+                        .ToArray() ?? [];
+                    if (selections.Length == 0 || selections.Length > 100)
+                    {
+                        return Results.ValidationProblem(new Dictionary<string, string[]>
+                        {
+                            ["games"] = ["Provide between 1 and 100 game selections."]
+                        });
+                    }
+
+                    if (selections.Any(game => game.IgdbGameId is <= 0))
+                    {
+                        return Results.ValidationProblem(new Dictionary<string, string[]>
+                        {
+                            ["igdbGameId"] = ["IGDB game IDs must be greater than zero."]
+                        });
+                    }
+
+                    var gameNotes = await repository.ListAsync(null, null, cancellationToken);
+                    var notesById = gameNotes.ToDictionary(game => game.Id, StringComparer.OrdinalIgnoreCase);
+                    var lookups = selections
+                        .Where(selection => notesById.ContainsKey(selection.Id))
+                        .Select(selection =>
+                        {
+                            var game = notesById[selection.Id];
+                            return new IgdbArtworkLookup(game.Id, game.Title, selection.IgdbGameId);
+                        })
+                        .ToArray();
+                    var result = await igdb.GetCardArtworkAsync(lookups, cancellationToken);
+                    return Results.Ok(result);
+                })
+            .WithTags("Game Metadata")
+            .WithName("GetIgdbCardArtwork")
+            .WithSummary("Get IGDB artwork for game cards")
+            .WithDescription("Batch-loads cached IGDB artwork for game-note cards. Optional IGDB IDs take priority over title matching, and notes are not modified.")
+            .Accepts<GameArtworkBatchRequest>("application/json")
+            .Produces<IgdbCardArtworkResult>(StatusCodes.Status200OK)
+            .ProducesValidationProblem();
+
         return endpoints;
     }
 }
+
+public sealed record GameArtworkBatchRequest(IReadOnlyList<GameArtworkSelection>? Games);
+
+public sealed record GameArtworkSelection(string Id, long? IgdbGameId);

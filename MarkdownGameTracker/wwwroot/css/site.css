@@ -454,7 +454,6 @@ html[data-theme="dark"] .theme-icon-sun {
 .game-card {
   position: relative;
   min-height: 230px;
-  padding: 1.4rem;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--border);
@@ -462,6 +461,52 @@ html[data-theme="dark"] .theme-icon-sun {
   background: var(--surface);
   box-shadow: 0 6px 18px rgba(69, 116, 158, 0.06);
   transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.game-card-artwork {
+  position: relative;
+  height: 150px;
+  flex: 0 0 150px;
+  overflow: hidden;
+  border-radius: calc(var(--radius-md) - 1px) calc(var(--radius-md) - 1px) 0 0;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, #dceeff, #b3d9ff);
+}
+
+.game-card-artwork img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  opacity: 0;
+  transform: scale(1.015);
+  transition: opacity 220ms ease, transform 260ms ease;
+}
+
+.game-card.has-artwork .game-card-artwork img {
+  opacity: 1;
+}
+
+.game-card:hover .game-card-artwork img {
+  transform: scale(1.045);
+}
+
+.game-card-artwork[data-artwork-kind="cover"] {
+  background: linear-gradient(135deg, #eaf5ff, #b3d9ff);
+}
+
+.game-card-artwork[data-artwork-kind="cover"] img {
+  object-fit: contain;
+  padding: 0.55rem;
+  transform: none;
+}
+
+.game-card-content {
+  min-height: 230px;
+  padding: 1.4rem;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
 }
 
 .game-card:hover {
@@ -950,14 +995,14 @@ html[data-theme="dark"] .theme-icon-sun {
 
 .game-hero-frame {
   position: relative;
-  min-height: clamp(250px, 35vw, 440px);
+  min-height: clamp(220px, 30vw, 360px);
   overflow: hidden;
   background: linear-gradient(125deg, var(--blue-200), var(--blue-100));
 }
 
 .game-hero-image {
   width: 100%;
-  height: clamp(250px, 35vw, 440px);
+  height: clamp(220px, 30vw, 360px);
   display: block;
   object-fit: cover;
   object-position: center;
@@ -971,15 +1016,54 @@ html[data-theme="dark"] .theme-icon-sun {
   align-items: flex-end;
   justify-content: space-between;
   gap: 1rem;
-  background: linear-gradient(0deg, rgba(8, 25, 40, 0.72), transparent 58%);
+  background:
+    linear-gradient(90deg, rgba(5, 18, 31, 0.84), rgba(8, 25, 40, 0.54) 62%, rgba(8, 25, 40, 0.36)),
+    linear-gradient(0deg, rgba(8, 25, 40, 0.68), transparent 72%);
 }
 
 .game-hero-frame[data-has-hero="false"] .game-hero-overlay {
   position: relative;
-  min-height: clamp(250px, 35vw, 360px);
+  min-height: clamp(220px, 30vw, 320px);
   background:
     radial-gradient(circle at 82% 15%, rgba(255, 255, 255, 0.7), transparent 18rem),
     linear-gradient(125deg, var(--blue-300), var(--blue-100));
+}
+
+.game-identity {
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: clamp(1rem, 2.5vw, 1.5rem);
+}
+
+.game-hero-title {
+  min-width: 0;
+  padding-bottom: 0.3rem;
+}
+
+.game-hero-title h1 {
+  max-width: 18ch;
+  margin: 0 0 0.45rem;
+  color: #fff;
+  font-size: clamp(2rem, 4.4vw, 4rem);
+  line-height: 0.98;
+  text-wrap: balance;
+  text-shadow: 0 3px 22px rgba(0, 0, 0, 0.62);
+}
+
+.game-hero-title .file-hint {
+  color: rgba(255, 255, 255, 0.82);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
+}
+
+.game-hero-frame[data-has-hero="false"] .game-hero-title h1 {
+  color: var(--ink);
+  text-shadow: none;
+}
+
+.game-hero-frame[data-has-hero="false"] .game-hero-title .file-hint {
+  color: var(--ink-soft);
+  text-shadow: none;
 }
 
 .game-cover-image {
@@ -993,7 +1077,9 @@ html[data-theme="dark"] .theme-icon-sun {
 }
 
 .game-artwork-credit {
-  align-self: flex-end;
+  position: absolute;
+  top: clamp(0.75rem, 2vw, 1.2rem);
+  right: clamp(0.75rem, 2vw, 1.2rem);
   padding: 0.4rem 0.65rem;
   color: rgba(255, 255, 255, 0.92);
   border-radius: 999px;
@@ -1646,6 +1732,12 @@ html[data-theme="dark"] .game-card {
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
 }
 
+html[data-theme="dark"] .game-card-artwork,
+html[data-theme="dark"] .game-card-artwork[data-artwork-kind="cover"] {
+  border-color: #29465d;
+  background: linear-gradient(135deg, #17344b, #24567a);
+}
+
 html[data-theme="dark"] .status-option.current,
 html[data-theme="dark"] .status-option:disabled {
   background: #13283a;
@@ -1878,6 +1970,19 @@ a:focus-visible {
 
   .game-screenshot-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .game-hero-overlay {
+    padding: 1rem;
+  }
+
+  .game-cover-image {
+    width: clamp(82px, 25vw, 112px);
+    max-height: 168px;
+  }
+
+  .game-hero-title h1 {
+    font-size: clamp(1.65rem, 8vw, 2.5rem);
   }
 
   .site-footer .container {

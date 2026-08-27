@@ -19,6 +19,10 @@ public interface IIgdbDescriptionService
     Task<IgdbMatchSearchResult> SearchMatchesAsync(
         string title,
         CancellationToken cancellationToken);
+
+    Task<IgdbCardArtworkResult> GetCardArtworkAsync(
+        IReadOnlyList<IgdbArtworkLookup> games,
+        CancellationToken cancellationToken);
 }
 
 public sealed class IgdbDescriptionService(
@@ -49,7 +53,7 @@ public sealed class IgdbDescriptionService(
 
         var normalizedTitle = title.Trim();
         var cacheKey = igdbGameId is null
-            ? $"igdb-description:title:{normalizedTitle.ToLowerInvariant()}"
+            ? $"igdb-description:title:v2:{normalizedTitle.ToLowerInvariant()}"
             : $"igdb-description:id:{igdbGameId.Value}";
         if (cache.TryGetValue(cacheKey, out IgdbDescriptionResult? cachedResult)
             && cachedResult is not null)
@@ -75,21 +79,30 @@ public sealed class IgdbDescriptionService(
         }
 
         var normalizedTitle = title.Trim();
-        var cacheKey = $"igdb-matches:{normalizedTitle.ToLowerInvariant()}";
+        var cacheKey = $"igdb-matches:v2:{normalizedTitle.ToLowerInvariant()}";
         if (cache.TryGetValue(cacheKey, out IgdbMatchSearchResult? cachedResult)
             && cachedResult is not null)
         {
             return cachedResult;
         }
 
-        var query = $"search \"{EscapeSearchText(normalizedTitle)}\"; "
-                    + "fields id,name,first_release_date,slug,url,cover.image_id; limit 10;";
-        var queryResult = await QueryGamesAsync(normalizedTitle, query, cancellationToken);
-        var result = !queryResult.Succeeded
+        const string matchFields = "id,name,first_release_date,slug,url,cover.image_id";
+        var exactQuery = $"fields {matchFields}; "
+                         + $"where name = \"{EscapeSearchText(normalizedTitle)}\"; limit 10;";
+        var searchQuery = $"search \"{EscapeSearchText(normalizedTitle)}\"; "
+                          + $"fields {matchFields}; where version_parent = null; limit 25;";
+        var exactResult = await QueryGamesAsync(normalizedTitle, exactQuery, cancellationToken);
+        var searchResult = await QueryGamesAsync(normalizedTitle, searchQuery, cancellationToken);
+        var candidates = exactResult.Games
+            .Where(game => string.Equals(game.Name, normalizedTitle, StringComparison.OrdinalIgnoreCase))
+            .Concat(searchResult.Games)
+            .DistinctBy(game => game.Id)
+            .ToArray();
+        var result = !exactResult.Succeeded && !searchResult.Succeeded
             ? IgdbMatchSearchResult.Unavailable()
-            : queryResult.Games.Length == 0
+            : candidates.Length == 0
                 ? IgdbMatchSearchResult.NotFound()
-                : IgdbMatchSearchResult.Available(queryResult.Games.Select(ToMatch).ToArray());
+                : IgdbMatchSearchResult.Available(candidates.Select(ToMatch).ToArray());
 
         cache.Set(
             cacheKey,
@@ -98,27 +111,135 @@ public sealed class IgdbDescriptionService(
         return result;
     }
 
+    public async Task<IgdbCardArtworkResult> GetCardArtworkAsync(
+        IReadOnlyList<IgdbArtworkLookup> games,
+        CancellationToken cancellationToken)
+    {
+        if (!_options.IsConfigured)
+        {
+            return IgdbCardArtworkResult.NotConfigured();
+        }
+
+        var requestedGames = games
+            .Where(game => !string.IsNullOrWhiteSpace(game.GameId)
+                           && !string.IsNullOrWhiteSpace(game.Title))
+            .DistinctBy(game => game.GameId, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var artwork = new List<IgdbCardArtwork>();
+        var pending = new List<IgdbArtworkLookup>();
+
+        foreach (var game in requestedGames)
+        {
+            var cacheKey = GetArtworkCacheKey(game);
+            if (cache.TryGetValue(cacheKey, out IgdbArtworkCacheEntry? cached)
+                && cached is not null)
+            {
+                if (cached.Artwork is not null)
+                {
+                    artwork.Add(cached.Artwork with { GameId = game.GameId });
+                }
+
+                continue;
+            }
+
+            pending.Add(game);
+        }
+
+        var allQueriesSucceeded = true;
+        var selectedGames = pending.Where(game => game.IgdbGameId is > 0).ToArray();
+        if (selectedGames.Length > 0)
+        {
+            var ids = selectedGames.Select(game => game.IgdbGameId!.Value).Distinct().ToArray();
+            var query = "fields id,name,cover.image_id,artworks.image_id,artworks.width,artworks.height; "
+                        + $"where id = ({string.Join(',', ids)}); limit {ids.Length};";
+            var selectedResult = await QueryGamesAsync("card artwork by ID", query, cancellationToken);
+            allQueriesSucceeded &= selectedResult.Succeeded;
+            if (selectedResult.Succeeded)
+            {
+                var gamesById = selectedResult.Games.ToDictionary(game => game.Id);
+                foreach (var requested in selectedGames)
+                {
+                    gamesById.TryGetValue(requested.IgdbGameId!.Value, out var match);
+                    CacheArtwork(requested, match, artwork);
+                }
+            }
+        }
+
+        var titleGames = pending.Where(game => game.IgdbGameId is null or <= 0).ToArray();
+        for (var offset = 0; offset < titleGames.Length; offset += 10)
+        {
+            var batch = titleGames.Skip(offset).Take(10).ToArray();
+            var query = string.Join(
+                Environment.NewLine,
+                batch.Select((game, index) =>
+                    $"query games \"game{index}\" {{ "
+                    + "fields id,name,cover.image_id,artworks.image_id,artworks.width,artworks.height; "
+                    + $"where name = \"{EscapeSearchText(game.Title.Trim())}\"; limit 10; }};"));
+            var batchResult = await QueryMultipleGamesAsync(query, cancellationToken);
+            allQueriesSucceeded &= batchResult.Succeeded;
+            if (!batchResult.Succeeded)
+            {
+                continue;
+            }
+
+            var resultsByName = batchResult.Results.ToDictionary(result => result.Name, StringComparer.Ordinal);
+            for (var index = 0; index < batch.Length; index++)
+            {
+                var requested = batch[index];
+                resultsByName.TryGetValue($"game{index}", out var matches);
+                var match = matches?.Result.FirstOrDefault(game =>
+                                string.Equals(game.Name, requested.Title.Trim(), StringComparison.OrdinalIgnoreCase))
+                            ?? matches?.Result.FirstOrDefault();
+                CacheArtwork(requested, match, artwork);
+            }
+        }
+
+        return !allQueriesSucceeded && artwork.Count == 0
+            ? IgdbCardArtworkResult.Unavailable()
+            : IgdbCardArtworkResult.Available(artwork);
+    }
+
     private async Task<IgdbDescriptionResult> LookupDescriptionAsync(
         string title,
         long? igdbGameId,
         CancellationToken cancellationToken)
     {
-        var query = igdbGameId is null
-            ? $"search \"{EscapeSearchText(title)}\"; "
-              + $"fields {DescriptionFields}; limit 10;"
-            : $"fields {DescriptionFields}; "
-              + $"where id = {igdbGameId.Value}; limit 1;";
-        var queryResult = await QueryGamesAsync(title, query, cancellationToken);
-        if (!queryResult.Succeeded)
+        if (igdbGameId is not null)
+        {
+            var selectedQuery = $"fields {DescriptionFields}; "
+                                + $"where id = {igdbGameId.Value}; limit 1;";
+            var selectedResult = await QueryGamesAsync(title, selectedQuery, cancellationToken);
+            return !selectedResult.Succeeded
+                ? IgdbDescriptionResult.Unavailable()
+                : ToDescriptionResult(selectedResult.Games.FirstOrDefault());
+        }
+
+        var exactQuery = $"fields {DescriptionFields}; "
+                         + $"where name = \"{EscapeSearchText(title)}\"; limit 10;";
+        var exactResult = await QueryGamesAsync(title, exactQuery, cancellationToken);
+        var match = exactResult.Games.FirstOrDefault(game =>
+            string.Equals(game.Name, title, StringComparison.OrdinalIgnoreCase));
+        if (match is not null)
+        {
+            return ToDescriptionResult(match);
+        }
+
+        var searchQuery = $"search \"{EscapeSearchText(title)}\"; "
+                          + $"fields {DescriptionFields}; where version_parent = null; limit 25;";
+        var searchResult = await QueryGamesAsync(title, searchQuery, cancellationToken);
+        if (!exactResult.Succeeded && !searchResult.Succeeded)
         {
             return IgdbDescriptionResult.Unavailable();
         }
 
-        var match = igdbGameId is null
-            ? queryResult.Games.FirstOrDefault(game =>
-                  string.Equals(game.Name, title, StringComparison.OrdinalIgnoreCase))
-              ?? queryResult.Games.FirstOrDefault()
-            : queryResult.Games.FirstOrDefault();
+        match = searchResult.Games.FirstOrDefault(game =>
+                    string.Equals(game.Name, title, StringComparison.OrdinalIgnoreCase))
+                ?? searchResult.Games.FirstOrDefault();
+        return ToDescriptionResult(match);
+    }
+
+    private static IgdbDescriptionResult ToDescriptionResult(IgdbGame? match)
+    {
         if (match is null)
         {
             return IgdbDescriptionResult.NotFound();
@@ -169,12 +290,12 @@ public sealed class IgdbDescriptionService(
     {
         try
         {
-            var response = await SendGamesQueryAsync(query, refreshToken: false, cancellationToken);
+            var response = await SendIgdbQueryAsync("games", query, refreshToken: false, cancellationToken);
             if (response.StatusCode == HttpStatusCode.Unauthorized)
             {
                 _accessToken = null;
                 response.Dispose();
-                response = await SendGamesQueryAsync(query, refreshToken: true, cancellationToken);
+                response = await SendIgdbQueryAsync("games", query, refreshToken: true, cancellationToken);
             }
 
             using (response)
@@ -209,13 +330,60 @@ public sealed class IgdbDescriptionService(
         }
     }
 
-    private async Task<HttpResponseMessage> SendGamesQueryAsync(
+    private async Task<IgdbMultiQueryResult> QueryMultipleGamesAsync(
+        string query,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await SendIgdbQueryAsync("multiquery", query, refreshToken: false, cancellationToken);
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                _accessToken = null;
+                response.Dispose();
+                response = await SendIgdbQueryAsync("multiquery", query, refreshToken: true, cancellationToken);
+            }
+
+            using (response)
+            {
+                if (!response.IsSuccessStatusCode)
+                {
+                    logger.LogWarning(
+                        "IGDB multi-query failed with status code {StatusCode}.",
+                        response.StatusCode);
+                    return IgdbMultiQueryResult.Failed();
+                }
+
+                var results = await response.Content.ReadFromJsonAsync<IgdbNamedGameResult[]>(cancellationToken)
+                    ?? [];
+                return IgdbMultiQueryResult.Success(results);
+            }
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            logger.LogWarning("IGDB card artwork lookup timed out.");
+            return IgdbMultiQueryResult.Failed();
+        }
+        catch (HttpRequestException exception)
+        {
+            logger.LogWarning(exception, "IGDB card artwork lookup failed.");
+            return IgdbMultiQueryResult.Failed();
+        }
+        catch (JsonException exception)
+        {
+            logger.LogWarning(exception, "IGDB returned an invalid card artwork response.");
+            return IgdbMultiQueryResult.Failed();
+        }
+    }
+
+    private async Task<HttpResponseMessage> SendIgdbQueryAsync(
+        string endpoint,
         string query,
         bool refreshToken,
         CancellationToken cancellationToken)
     {
         var token = await GetAccessTokenAsync(refreshToken, cancellationToken);
-        using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.igdb.com/v4/games")
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"https://api.igdb.com/v4/{endpoint}")
         {
             Content = new StringContent(query, Encoding.UTF8, "text/plain")
         };
@@ -274,6 +442,46 @@ public sealed class IgdbDescriptionService(
 
     private static bool IsStableStatus(string status) =>
         status is IgdbDescriptionResult.AvailableStatus or IgdbDescriptionResult.NotFoundStatus;
+
+    private static string GetArtworkCacheKey(IgdbArtworkLookup game) =>
+        game.IgdbGameId is > 0
+            ? $"igdb-card-artwork:id:{game.IgdbGameId.Value}"
+            : $"igdb-card-artwork:title:{game.Title.Trim().ToLowerInvariant()}";
+
+    private void CacheArtwork(
+        IgdbArtworkLookup requested,
+        IgdbGame? match,
+        ICollection<IgdbCardArtwork> results)
+    {
+        var selectedArtwork = match is null ? null : ToCardArtwork(requested.GameId, match);
+        cache.Set(
+            GetArtworkCacheKey(requested),
+            new IgdbArtworkCacheEntry(selectedArtwork),
+            MetadataCacheDuration);
+        if (selectedArtwork is not null)
+        {
+            results.Add(selectedArtwork);
+        }
+    }
+
+    private static IgdbCardArtwork? ToCardArtwork(string gameId, IgdbGame game)
+    {
+        var landscape = game.Artworks?
+            .Where(image => image.Width > image.Height)
+            .OrderByDescending(image => (long)image.Width.GetValueOrDefault()
+                                        * image.Height.GetValueOrDefault())
+            .FirstOrDefault();
+        var artworkUrl = BuildImageUrl(landscape?.ImageId, "720p");
+        if (artworkUrl is not null)
+        {
+            return new IgdbCardArtwork(gameId, game.Id, game.Name, artworkUrl, "artwork");
+        }
+
+        var coverUrl = BuildImageUrl(game.Cover?.ImageId, "cover_big_2x");
+        return coverUrl is null
+            ? null
+            : new IgdbCardArtwork(gameId, game.Id, game.Name, coverUrl, "cover");
+    }
 
     private static IgdbGameMatch ToMatch(IgdbGame game) =>
         new(
@@ -349,6 +557,19 @@ public sealed class IgdbDescriptionService(
 
         public static IgdbQueryResult Failed() => new(false, []);
     }
+
+    private sealed record IgdbNamedGameResult(
+        [property: JsonPropertyName("name")] string Name,
+        [property: JsonPropertyName("result")] IgdbGame[] Result);
+
+    private sealed record IgdbMultiQueryResult(bool Succeeded, IgdbNamedGameResult[] Results)
+    {
+        public static IgdbMultiQueryResult Success(IgdbNamedGameResult[] results) => new(true, results);
+
+        public static IgdbMultiQueryResult Failed() => new(false, []);
+    }
+
+    private sealed record IgdbArtworkCacheEntry(IgdbCardArtwork? Artwork);
 }
 
 public sealed record IgdbDescriptionResult(
@@ -415,5 +636,26 @@ public sealed record IgdbMatchSearchResult(string Status, IReadOnlyList<IgdbGame
         new(IgdbDescriptionResult.NotFoundStatus, []);
 
     public static IgdbMatchSearchResult Unavailable() =>
+        new(IgdbDescriptionResult.UnavailableStatus, []);
+}
+
+public sealed record IgdbArtworkLookup(string GameId, string Title, long? IgdbGameId);
+
+public sealed record IgdbCardArtwork(
+    string GameId,
+    long IgdbGameId,
+    string MatchedTitle,
+    string ArtworkUrl,
+    string Kind);
+
+public sealed record IgdbCardArtworkResult(string Status, IReadOnlyList<IgdbCardArtwork> Artwork)
+{
+    public static IgdbCardArtworkResult Available(IReadOnlyList<IgdbCardArtwork> artwork) =>
+        new(IgdbDescriptionResult.AvailableStatus, artwork);
+
+    public static IgdbCardArtworkResult NotConfigured() =>
+        new(IgdbDescriptionResult.NotConfiguredStatus, []);
+
+    public static IgdbCardArtworkResult Unavailable() =>
         new(IgdbDescriptionResult.UnavailableStatus, []);
 }

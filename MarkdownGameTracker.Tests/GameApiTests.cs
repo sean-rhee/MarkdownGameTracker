@@ -46,10 +46,15 @@ public sealed class GameApiTests
         Assert.Contains("Endless", homeHtml);
         Assert.Contains("Plan to play", homeHtml);
         Assert.Contains("status-tabs", homeHtml);
+        Assert.Contains("data-game-artwork-grid", homeHtml);
+        Assert.Contains("data-game-id=\"Frontend Game\"", homeHtml);
+        Assert.Contains("game-card-artwork.js", homeHtml);
         Assert.Contains("#b3d9ff", homeHtml, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("<h2", detailsHtml);
         Assert.Contains("data-game-description", detailsHtml);
         Assert.Contains("data-game-media", detailsHtml);
+        Assert.Contains("game-hero-title", detailsHtml);
+        Assert.Contains("data-has-hero=\"false\"", detailsHtml);
         Assert.Contains("Choose another match", detailsHtml);
         Assert.Contains("not stored in your note", detailsHtml);
         Assert.Contains("<strong>lovely</strong>", detailsHtml);
@@ -131,6 +136,7 @@ public sealed class GameApiTests
         Assert.True(paths.GetProperty("/api/games/{id}").TryGetProperty("delete", out _));
         Assert.True(paths.GetProperty("/api/games/{id}/igdb-description").TryGetProperty("get", out _));
         Assert.True(paths.GetProperty("/api/games/{id}/igdb-matches").TryGetProperty("get", out _));
+        Assert.True(paths.GetProperty("/api/games/igdb-card-artwork").TryGetProperty("post", out _));
         Assert.True(paths.GetProperty("/api/markdown/preview").TryGetProperty("post", out _));
 
         var swaggerHtml = await swaggerResponse.Content.ReadAsStringAsync();
@@ -182,6 +188,36 @@ public sealed class GameApiTests
     }
 
     [Fact]
+    public async Task Igdb_card_artwork_is_loaded_in_a_batch_without_changing_notes()
+    {
+        using var app = new TestApp();
+        const string originalNote = "---\ntype: game\nstatus: active\n---\nMy notes stay local.";
+        app.WriteGame("Metadata Game", originalNote);
+
+        var response = await app.Client.PostAsJsonAsync(
+            "/api/games/igdb-card-artwork",
+            new
+            {
+                games = new[]
+                {
+                    new { id = "Metadata Game", igdbGameId = (long?)202 }
+                }
+            });
+        var result = await response.Content.ReadFromJsonAsync<IgdbCardArtworkResult>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(result);
+        var artwork = Assert.Single(result.Artwork);
+        Assert.Equal("Metadata Game", artwork.GameId);
+        Assert.Equal(202, artwork.IgdbGameId);
+        Assert.Equal("artwork", artwork.Kind);
+        Assert.Equal(
+            "https://images.igdb.com/igdb/image/upload/t_720p/artwork-remastered.jpg",
+            artwork.ArtworkUrl);
+        Assert.Equal(originalNote, await File.ReadAllTextAsync(app.GamePath("Metadata Game")));
+    }
+
+    [Fact]
     public async Task Igdb_service_searches_candidates_and_loads_the_selected_game_id()
     {
         using var handler = new FakeIgdbHttpHandler();
@@ -202,6 +238,7 @@ public sealed class GameApiTests
 
         Assert.Equal(IgdbDescriptionResult.AvailableStatus, matches.Status);
         Assert.Equal(2, matches.Matches.Count);
+        Assert.Equal("Metadata Game", matches.Matches[0].Title);
         Assert.Equal(2024, matches.Matches[1].ReleaseYear);
         Assert.Equal(202, description.IgdbGameId);
         Assert.Equal("Metadata Game Remastered", description.MatchedTitle);
@@ -217,9 +254,78 @@ public sealed class GameApiTests
             "https://images.igdb.com/igdb/image/upload/t_cover_small_2x/cover202.jpg",
             matches.Matches[1].CoverUrl);
         Assert.Equal(1, handler.TokenRequestCount);
-        Assert.Equal(2, handler.GameQueries.Count);
-        Assert.Contains("search \"Metadata Game\"", handler.GameQueries[0]);
-        Assert.Contains("where id = 202", handler.GameQueries[1]);
+        Assert.Equal(3, handler.GameQueries.Count);
+        Assert.Contains("where name = \"Metadata Game\"", handler.GameQueries[0]);
+        Assert.Contains("search \"Metadata Game\"", handler.GameQueries[1]);
+        Assert.Contains("where version_parent = null", handler.GameQueries[1]);
+        Assert.Contains("where id = 202", handler.GameQueries[2]);
+    }
+
+    [Fact]
+    public async Task Igdb_service_uses_an_exact_title_before_similarity_results_for_description()
+    {
+        using var handler = new FakeIgdbHttpHandler();
+        using var client = new HttpClient(handler);
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var service = new IgdbDescriptionService(
+            client,
+            Options.Create(new IgdbOptions
+            {
+                ClientId = "test-client-id",
+                ClientSecret = "test-client-secret"
+            }),
+            cache,
+            NullLogger<IgdbDescriptionService>.Instance);
+
+        var result = await service.GetDescriptionAsync("Metadata Game", null, CancellationToken.None);
+
+        Assert.Equal(IgdbDescriptionResult.AvailableStatus, result.Status);
+        Assert.Equal(101, result.IgdbGameId);
+        Assert.Equal("Metadata Game", result.MatchedTitle);
+        Assert.Equal("The exact title description.", result.Description);
+        Assert.Single(handler.GameQueries);
+        Assert.Contains("where name = \"Metadata Game\"", handler.GameQueries[0]);
+        Assert.DoesNotContain("search", handler.GameQueries[0]);
+    }
+
+    [Fact]
+    public async Task Igdb_service_batches_selected_and_title_matched_card_artwork()
+    {
+        using var handler = new FakeIgdbHttpHandler();
+        using var client = new HttpClient(handler);
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var service = new IgdbDescriptionService(
+            client,
+            Options.Create(new IgdbOptions
+            {
+                ClientId = "test-client-id",
+                ClientSecret = "test-client-secret"
+            }),
+            cache,
+            NullLogger<IgdbDescriptionService>.Instance);
+
+        var result = await service.GetCardArtworkAsync(
+            [
+                new IgdbArtworkLookup("Metadata Game", "Metadata Game", null),
+                new IgdbArtworkLookup("Chosen Game", "Wrong Local Title", 202)
+            ],
+            CancellationToken.None);
+
+        Assert.Equal(IgdbDescriptionResult.AvailableStatus, result.Status);
+        Assert.Equal(2, result.Artwork.Count);
+        Assert.Contains(result.Artwork, item =>
+            item.GameId == "Metadata Game"
+            && item.ArtworkUrl.EndsWith("/artwork101.jpg", StringComparison.Ordinal));
+        Assert.Contains(result.Artwork, item =>
+            item.GameId == "Chosen Game"
+            && item.IgdbGameId == 202
+            && item.ArtworkUrl.EndsWith("/art202.jpg", StringComparison.Ordinal));
+        Assert.Single(handler.GameQueries);
+        Assert.Contains("where id = (202)", handler.GameQueries[0]);
+        Assert.Single(handler.MultiQueries);
+        Assert.Contains("query games \"game0\"", handler.MultiQueries[0]);
+        Assert.Contains("where name = \"Metadata Game\"", handler.MultiQueries[0]);
+        Assert.Equal(1, handler.TokenRequestCount);
     }
 
     [Fact]
@@ -434,6 +540,20 @@ public sealed class GameApiTests
                     "https://www.igdb.com/games/metadata-game-remastered",
                     "https://images.igdb.com/igdb/image/upload/t_cover_small_2x/cover-remastered.jpg")
             ]));
+
+        public Task<IgdbCardArtworkResult> GetCardArtworkAsync(
+            IReadOnlyList<IgdbArtworkLookup> games,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(IgdbCardArtworkResult.Available(
+                games.Select(game => new IgdbCardArtwork(
+                    game.GameId,
+                    game.IgdbGameId ?? 101,
+                    game.IgdbGameId == 202 ? $"{game.Title} Remastered" : game.Title,
+                    game.IgdbGameId == 202
+                        ? "https://images.igdb.com/igdb/image/upload/t_720p/artwork-remastered.jpg"
+                        : "https://images.igdb.com/igdb/image/upload/t_720p/artwork-default.jpg",
+                    "artwork"))
+                .ToArray()));
     }
 
     private sealed class FakeIgdbHttpHandler : HttpMessageHandler
@@ -441,6 +561,8 @@ public sealed class GameApiTests
         public int TokenRequestCount { get; private set; }
 
         public List<string> GameQueries { get; } = [];
+
+        public List<string> MultiQueries { get; } = [];
 
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
@@ -463,9 +585,27 @@ public sealed class GameApiTests
             Assert.Equal("Bearer", request.Headers.Authorization?.Scheme);
             Assert.Equal("test-access-token", request.Headers.Authorization?.Parameter);
             var query = await request.Content!.ReadAsStringAsync(cancellationToken);
+
+            if (request.RequestUri?.AbsolutePath.EndsWith("/multiquery", StringComparison.Ordinal) == true)
+            {
+                MultiQueries.Add(query);
+                return JsonResponse("""
+                    [{
+                      "name":"game0",
+                      "result":[{
+                        "id":101,
+                        "name":"Metadata Game",
+                        "cover":{"image_id":"cover101"},
+                        "artworks":[{"image_id":"artwork101","width":1920,"height":1080}]
+                      }]
+                    }]
+                    """);
+            }
+
             GameQueries.Add(query);
 
             return query.Contains("where id = 202", StringComparison.Ordinal)
+                   || query.Contains("where id = (202)", StringComparison.Ordinal)
                 ? JsonResponse("""
                     [{
                       "id":202,
@@ -480,11 +620,21 @@ public sealed class GameApiTests
                       ]
                     }]
                     """)
+                : query.Contains("where name = \"Metadata Game\"", StringComparison.Ordinal)
+                    ? JsonResponse("""
+                        [{
+                          "id":101,
+                          "name":"Metadata Game",
+                          "summary":"The exact title description.",
+                          "slug":"metadata-game",
+                          "first_release_date":1577836800,
+                          "cover":{"image_id":"cover101"},
+                          "artworks":[{"image_id":"art101","width":1920,"height":1080}],
+                          "screenshots":[{"image_id":"shot101","width":1920,"height":1080}]
+                        }]
+                        """)
                 : JsonResponse("""
-                    [
-                      {"id":101,"name":"Metadata Game","first_release_date":1577836800,"slug":"metadata-game","cover":{"image_id":"cover101"}},
-                      {"id":202,"name":"Metadata Game Remastered","first_release_date":1704067200,"slug":"metadata-game-remastered","cover":{"image_id":"cover202"}}
-                    ]
+                    [{"id":202,"name":"Metadata Game Remastered","first_release_date":1704067200,"slug":"metadata-game-remastered","cover":{"image_id":"cover202"}}]
                     """);
         }
 

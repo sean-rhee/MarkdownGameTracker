@@ -15,6 +15,7 @@
   const heroFrame = mediaPanel.querySelector("[data-game-hero-frame]");
   const heroImage = mediaPanel.querySelector("[data-game-hero]");
   const coverImage = mediaPanel.querySelector("[data-game-cover]");
+  const artworkCredit = mediaPanel.querySelector("[data-artwork-credit]");
   const screenshotSection = mediaPanel.querySelector("[data-game-screenshots]");
   const screenshotGrid = mediaPanel.querySelector("[data-game-screenshot-grid]");
   const gameTitle = mediaPanel.dataset.gameTitle;
@@ -76,13 +77,12 @@
   };
 
   const clearMedia = () => {
-    mediaPanel.hidden = true;
-    heroFrame.hidden = true;
     heroFrame.dataset.hasHero = "false";
     heroImage.hidden = true;
     heroImage.removeAttribute("src");
     coverImage.hidden = true;
     coverImage.removeAttribute("src");
+    artworkCredit.hidden = true;
     screenshotSection.hidden = true;
     screenshotGrid.replaceChildren();
   };
@@ -92,11 +92,6 @@
     const screenshots = Array.isArray(result.screenshots) ? result.screenshots : [];
     if (!result.heroUrl && !result.coverUrl && screenshots.length === 0) {
       return;
-    }
-
-    mediaPanel.hidden = false;
-    if (result.heroUrl || result.coverUrl) {
-      heroFrame.hidden = false;
     }
 
     if (result.heroUrl) {
@@ -110,6 +105,8 @@
       coverImage.alt = `Cover art for ${result.matchedTitle ?? gameTitle}`;
       coverImage.hidden = false;
     }
+
+    artworkCredit.hidden = false;
 
     if (screenshots.length > 0) {
       for (const [index, screenshot] of screenshots.entries()) {

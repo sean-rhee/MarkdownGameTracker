@@ -19,8 +19,6 @@
                 <span class="rating-pill">★ @Model.Game.Rating / 10</span>
             }
         </div>
-        <h1>@Model.Game.Title</h1>
-        <p class="file-hint">Games/@(Model.Game.Id).md</p>
     </div>
     <div class="note-actions">
         <a class="btn btn-primary" asp-page="/Games/Edit" asp-route-id="@Model.Game.Id">Edit note</a>
@@ -31,18 +29,23 @@
 <section class="game-media-panel"
          aria-labelledby="gameArtworkHeading"
          data-game-media
-         data-game-title="@Model.Game.Title"
-         hidden>
+         data-game-title="@Model.Game.Title">
     <h2 class="visually-hidden" id="gameArtworkHeading">Artwork for @Model.Game.Title</h2>
-    <div class="game-hero-frame" data-game-hero-frame>
+    <div class="game-hero-frame" data-game-hero-frame data-has-hero="false">
         <img class="game-hero-image" data-game-hero alt="" referrerpolicy="no-referrer" hidden>
         <div class="game-hero-overlay">
-            <img class="game-cover-image"
-                 data-game-cover
-                 alt="Cover art for @Model.Game.Title"
-                 referrerpolicy="no-referrer"
-                 hidden>
-            <span class="game-artwork-credit">Artwork from IGDB</span>
+            <div class="game-identity">
+                <img class="game-cover-image"
+                     data-game-cover
+                     alt="Cover art for @Model.Game.Title"
+                     referrerpolicy="no-referrer"
+                     hidden>
+                <div class="game-hero-title">
+                    <h1>@Model.Game.Title</h1>
+                    <p class="file-hint">Games/@(Model.Game.Id).md</p>
+                </div>
+            </div>
+            <span class="game-artwork-credit" data-artwork-credit hidden>Artwork from IGDB</span>
         </div>
     </div>
     <div class="game-screenshot-section" data-game-screenshots hidden>
