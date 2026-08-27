@@ -11,6 +11,13 @@
   const matchToggle = card.querySelector("[data-match-toggle]");
   const matchPicker = card.querySelector("[data-match-picker]");
   const matchList = card.querySelector("[data-match-list]");
+  const mediaPanel = document.querySelector("[data-game-media]");
+  const heroFrame = mediaPanel.querySelector("[data-game-hero-frame]");
+  const heroImage = mediaPanel.querySelector("[data-game-hero]");
+  const coverImage = mediaPanel.querySelector("[data-game-cover]");
+  const screenshotSection = mediaPanel.querySelector("[data-game-screenshots]");
+  const screenshotGrid = mediaPanel.querySelector("[data-game-screenshot-grid]");
+  const gameTitle = mediaPanel.dataset.gameTitle;
   const storageKey = `game-garden:igdb-match:${card.dataset.gameId}`;
   let matchesLoaded = false;
   let matchesLoading = false;
@@ -68,10 +75,71 @@
     footer.hidden = false;
   };
 
+  const clearMedia = () => {
+    mediaPanel.hidden = true;
+    heroFrame.hidden = true;
+    heroFrame.dataset.hasHero = "false";
+    heroImage.hidden = true;
+    heroImage.removeAttribute("src");
+    coverImage.hidden = true;
+    coverImage.removeAttribute("src");
+    screenshotSection.hidden = true;
+    screenshotGrid.replaceChildren();
+  };
+
+  const renderMedia = (result) => {
+    clearMedia();
+    const screenshots = Array.isArray(result.screenshots) ? result.screenshots : [];
+    if (!result.heroUrl && !result.coverUrl && screenshots.length === 0) {
+      return;
+    }
+
+    mediaPanel.hidden = false;
+    if (result.heroUrl || result.coverUrl) {
+      heroFrame.hidden = false;
+    }
+
+    if (result.heroUrl) {
+      heroImage.src = result.heroUrl;
+      heroImage.hidden = false;
+      heroFrame.dataset.hasHero = "true";
+    }
+
+    if (result.coverUrl) {
+      coverImage.src = result.coverUrl;
+      coverImage.alt = `Cover art for ${result.matchedTitle ?? gameTitle}`;
+      coverImage.hidden = false;
+    }
+
+    if (screenshots.length > 0) {
+      for (const [index, screenshot] of screenshots.entries()) {
+        const link = document.createElement("a");
+        link.className = "game-screenshot-link";
+        link.href = screenshot.fullSizeUrl;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.setAttribute("aria-label", `Open screenshot ${index + 1} from ${result.matchedTitle ?? gameTitle}`);
+
+        const image = document.createElement("img");
+        image.src = screenshot.thumbnailUrl;
+        image.alt = `Screenshot ${index + 1} from ${result.matchedTitle ?? gameTitle}`;
+        image.loading = "lazy";
+        image.referrerPolicy = "no-referrer";
+        link.append(image);
+        screenshotGrid.append(link);
+      }
+
+      screenshotSection.hidden = false;
+    }
+  };
+
   const renderDescription = (result, requestedIgdbId) => {
     switch (result.status) {
       case "available":
-        showMessage(result.description, "available");
+        showMessage(
+          result.description ?? "IGDB does not have a description for this game yet.",
+          "available");
+        renderMedia(result);
         selectedIgdbId = result.igdbGameId;
         match.textContent = requestedIgdbId
           ? `Selected as ${result.matchedTitle} · remembered in this browser · not stored in your note`
@@ -86,14 +154,17 @@
         footer.hidden = false;
         break;
       case "notConfigured":
+        clearMedia();
         showMessage("Add IGDB credentials to enable game descriptions.", "not-configured");
         footer.hidden = true;
         break;
       case "notFound":
+        clearMedia();
         showMessage("IGDB did not return a description for this title.", "not-found");
         showChooser("No description found automatically · not stored in your note");
         break;
       default:
+        clearMedia();
         showMessage("The IGDB description is temporarily unavailable.", "unavailable");
         footer.hidden = true;
         break;
@@ -119,6 +190,7 @@
 
       renderDescription(result, igdbGameId);
     } catch {
+      clearMedia();
       showMessage("The IGDB description is temporarily unavailable.", "unavailable");
       footer.hidden = true;
     }
@@ -138,6 +210,7 @@
     matchPicker.hidden = true;
     matchToggle.setAttribute("aria-expanded", "false");
     matchToggle.textContent = "Choose another match";
+    clearMedia();
     showMessage(`Loading ${candidate.title}…`, "loading");
     footer.hidden = true;
     await loadDescription(selectedIgdbId);
@@ -153,6 +226,19 @@
         button.setAttribute("aria-current", "true");
       }
 
+      if (candidate.coverUrl) {
+        const cover = document.createElement("img");
+        cover.className = "igdb-match-cover";
+        cover.src = candidate.coverUrl;
+        cover.alt = "";
+        cover.loading = "lazy";
+        cover.referrerPolicy = "no-referrer";
+        button.append(cover);
+      }
+
+      const details = document.createElement("span");
+      details.className = "igdb-match-details";
+
       const title = document.createElement("span");
       title.className = "igdb-match-title";
       title.textContent = candidate.title;
@@ -161,7 +247,8 @@
       year.className = "igdb-match-year";
       year.textContent = candidate.releaseYear ?? "Year unknown";
 
-      button.append(title, year);
+      details.append(title, year);
+      button.append(details);
       button.addEventListener("click", () => chooseMatch(candidate));
       matchList.append(button);
     }

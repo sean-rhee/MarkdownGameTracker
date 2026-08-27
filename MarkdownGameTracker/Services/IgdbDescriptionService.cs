@@ -27,6 +27,10 @@ public sealed class IgdbDescriptionService(
     IMemoryCache cache,
     ILogger<IgdbDescriptionService> logger) : IIgdbDescriptionService
 {
+    private const string DescriptionFields =
+        "id,name,summary,storyline,slug,url,first_release_date,"
+        + "cover.image_id,artworks.image_id,artworks.width,artworks.height,"
+        + "screenshots.image_id,screenshots.width,screenshots.height";
     private static readonly TimeSpan MetadataCacheDuration = TimeSpan.FromHours(24);
     private static readonly TimeSpan FailureCacheDuration = TimeSpan.FromMinutes(5);
     private readonly IgdbOptions _options = options.Value;
@@ -79,7 +83,7 @@ public sealed class IgdbDescriptionService(
         }
 
         var query = $"search \"{EscapeSearchText(normalizedTitle)}\"; "
-                    + "fields id,name,first_release_date,slug,url; limit 10;";
+                    + "fields id,name,first_release_date,slug,url,cover.image_id; limit 10;";
         var queryResult = await QueryGamesAsync(normalizedTitle, query, cancellationToken);
         var result = !queryResult.Succeeded
             ? IgdbMatchSearchResult.Unavailable()
@@ -101,8 +105,8 @@ public sealed class IgdbDescriptionService(
     {
         var query = igdbGameId is null
             ? $"search \"{EscapeSearchText(title)}\"; "
-              + "fields id,name,summary,storyline,slug,url,first_release_date; limit 10;"
-            : $"fields id,name,summary,storyline,slug,url,first_release_date; "
+              + $"fields {DescriptionFields}; limit 10;"
+            : $"fields {DescriptionFields}; "
               + $"where id = {igdbGameId.Value}; limit 1;";
         var queryResult = await QueryGamesAsync(title, query, cancellationToken);
         if (!queryResult.Succeeded)
@@ -123,16 +127,39 @@ public sealed class IgdbDescriptionService(
         var description = !string.IsNullOrWhiteSpace(match.Summary)
             ? match.Summary
             : match.Storyline;
-        if (string.IsNullOrWhiteSpace(description))
+        var coverUrl = BuildImageUrl(match.Cover?.ImageId, "cover_big_2x");
+        var heroImage = match.Artworks?
+                            .Where(image => image.Width > image.Height)
+                            .OrderByDescending(image => (long)image.Width.GetValueOrDefault()
+                                                        * image.Height.GetValueOrDefault())
+                            .FirstOrDefault()
+                        ?? match.Screenshots?.FirstOrDefault()
+                        ?? match.Artworks?.FirstOrDefault();
+        var heroUrl = BuildImageUrl(heroImage?.ImageId, "1080p");
+        var screenshots = (match.Screenshots ?? [])
+            .Where(image => !string.IsNullOrWhiteSpace(image.ImageId))
+            .DistinctBy(image => image.ImageId, StringComparer.Ordinal)
+            .Take(6)
+            .Select(image => new IgdbScreenshot(
+                BuildImageUrl(image.ImageId, "screenshot_med_2x")!,
+                BuildImageUrl(image.ImageId, "1080p")!))
+            .ToArray();
+        if (string.IsNullOrWhiteSpace(description)
+            && coverUrl is null
+            && heroUrl is null
+            && screenshots.Length == 0)
         {
             return IgdbDescriptionResult.NotFound();
         }
 
         return IgdbDescriptionResult.Available(
             match.Id,
-            description.Trim(),
+            description?.Trim(),
             match.Name,
-            GetSourceUrl(match));
+            GetSourceUrl(match),
+            coverUrl,
+            heroUrl,
+            screenshots);
     }
 
     private async Task<IgdbQueryResult> QueryGamesAsync(
@@ -249,7 +276,17 @@ public sealed class IgdbDescriptionService(
         status is IgdbDescriptionResult.AvailableStatus or IgdbDescriptionResult.NotFoundStatus;
 
     private static IgdbGameMatch ToMatch(IgdbGame game) =>
-        new(game.Id, game.Name, GetReleaseYear(game.FirstReleaseDate), GetSourceUrl(game));
+        new(
+            game.Id,
+            game.Name,
+            GetReleaseYear(game.FirstReleaseDate),
+            GetSourceUrl(game),
+            BuildImageUrl(game.Cover?.ImageId, "cover_small_2x"));
+
+    private static string? BuildImageUrl(string? imageId, string size) =>
+        string.IsNullOrWhiteSpace(imageId)
+            ? null
+            : $"https://images.igdb.com/igdb/image/upload/t_{size}/{Uri.EscapeDataString(imageId)}.jpg";
 
     private static int? GetReleaseYear(long? timestamp)
     {
@@ -296,7 +333,15 @@ public sealed class IgdbDescriptionService(
         [property: JsonPropertyName("storyline")] string? Storyline,
         [property: JsonPropertyName("slug")] string? Slug,
         [property: JsonPropertyName("url")] string? Url,
-        [property: JsonPropertyName("first_release_date")] long? FirstReleaseDate);
+        [property: JsonPropertyName("first_release_date")] long? FirstReleaseDate,
+        [property: JsonPropertyName("cover")] IgdbImage? Cover,
+        [property: JsonPropertyName("artworks")] IgdbImage[]? Artworks,
+        [property: JsonPropertyName("screenshots")] IgdbImage[]? Screenshots);
+
+    private sealed record IgdbImage(
+        [property: JsonPropertyName("image_id")] string ImageId,
+        [property: JsonPropertyName("width")] int? Width,
+        [property: JsonPropertyName("height")] int? Height);
 
     private sealed record IgdbQueryResult(bool Succeeded, IgdbGame[] Games)
     {
@@ -311,7 +356,10 @@ public sealed record IgdbDescriptionResult(
     long? IgdbGameId,
     string? Description,
     string? MatchedTitle,
-    string? SourceUrl)
+    string? SourceUrl,
+    string? CoverUrl,
+    string? HeroUrl,
+    IReadOnlyList<IgdbScreenshot> Screenshots)
 {
     public const string AvailableStatus = "available";
     public const string NotConfiguredStatus = "notConfigured";
@@ -320,26 +368,40 @@ public sealed record IgdbDescriptionResult(
 
     public static IgdbDescriptionResult Available(
         long igdbGameId,
-        string description,
+        string? description,
         string matchedTitle,
-        string sourceUrl) =>
-        new(AvailableStatus, igdbGameId, description, matchedTitle, sourceUrl);
+        string sourceUrl,
+        string? coverUrl = null,
+        string? heroUrl = null,
+        IReadOnlyList<IgdbScreenshot>? screenshots = null) =>
+        new(
+            AvailableStatus,
+            igdbGameId,
+            description,
+            matchedTitle,
+            sourceUrl,
+            coverUrl,
+            heroUrl,
+            screenshots ?? []);
 
     public static IgdbDescriptionResult NotConfigured() =>
-        new(NotConfiguredStatus, null, null, null, null);
+        new(NotConfiguredStatus, null, null, null, null, null, null, []);
 
     public static IgdbDescriptionResult NotFound() =>
-        new(NotFoundStatus, null, null, null, null);
+        new(NotFoundStatus, null, null, null, null, null, null, []);
 
     public static IgdbDescriptionResult Unavailable() =>
-        new(UnavailableStatus, null, null, null, null);
+        new(UnavailableStatus, null, null, null, null, null, null, []);
 }
+
+public sealed record IgdbScreenshot(string ThumbnailUrl, string FullSizeUrl);
 
 public sealed record IgdbGameMatch(
     long IgdbGameId,
     string Title,
     int? ReleaseYear,
-    string SourceUrl);
+    string SourceUrl,
+    string? CoverUrl = null);
 
 public sealed record IgdbMatchSearchResult(string Status, IReadOnlyList<IgdbGameMatch> Matches)
 {

@@ -28,6 +28,35 @@
     </div>
 </div>
 
+<section class="game-media-panel"
+         aria-labelledby="gameArtworkHeading"
+         data-game-media
+         data-game-title="@Model.Game.Title"
+         hidden>
+    <h2 class="visually-hidden" id="gameArtworkHeading">Artwork for @Model.Game.Title</h2>
+    <div class="game-hero-frame" data-game-hero-frame>
+        <img class="game-hero-image" data-game-hero alt="" referrerpolicy="no-referrer" hidden>
+        <div class="game-hero-overlay">
+            <img class="game-cover-image"
+                 data-game-cover
+                 alt="Cover art for @Model.Game.Title"
+                 referrerpolicy="no-referrer"
+                 hidden>
+            <span class="game-artwork-credit">Artwork from IGDB</span>
+        </div>
+    </div>
+    <div class="game-screenshot-section" data-game-screenshots hidden>
+        <div class="game-screenshot-heading">
+            <div>
+                <span class="eyebrow">Gallery</span>
+                <h3>Screenshots</h3>
+            </div>
+            <span>Open any image at full size</span>
+        </div>
+        <div class="game-screenshot-grid" data-game-screenshot-grid></div>
+    </div>
+</section>
+
 <section class="game-description-card"
          aria-labelledby="gameDescriptionHeading"
          data-game-description

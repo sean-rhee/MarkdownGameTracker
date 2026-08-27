@@ -49,6 +49,7 @@ public sealed class GameApiTests
         Assert.Contains("#b3d9ff", homeHtml, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("<h2", detailsHtml);
         Assert.Contains("data-game-description", detailsHtml);
+        Assert.Contains("data-game-media", detailsHtml);
         Assert.Contains("Choose another match", detailsHtml);
         Assert.Contains("not stored in your note", detailsHtml);
         Assert.Contains("<strong>lovely</strong>", detailsHtml);
@@ -167,6 +168,13 @@ public sealed class GameApiTests
         Assert.Equal(202, selectedResult.IgdbGameId);
         Assert.Equal("Metadata Game Remastered", selectedResult.MatchedTitle);
         Assert.Equal("The remastered description.", selectedResult.Description);
+        Assert.Equal(
+            "https://images.igdb.com/igdb/image/upload/t_cover_big_2x/cover-remastered.jpg",
+            selectedResult.CoverUrl);
+        Assert.Equal(
+            "https://images.igdb.com/igdb/image/upload/t_1080p/artwork-remastered.jpg",
+            selectedResult.HeroUrl);
+        Assert.Equal(2, selectedResult.Screenshots.Count);
         Assert.Equal(originalNote, await File.ReadAllTextAsync(app.GamePath("Metadata Game")));
 
         var missingResponse = await app.Client.GetAsync("/api/games/Missing/igdb-description");
@@ -198,6 +206,16 @@ public sealed class GameApiTests
         Assert.Equal(202, description.IgdbGameId);
         Assert.Equal("Metadata Game Remastered", description.MatchedTitle);
         Assert.Equal("The exact selected description.", description.Description);
+        Assert.Equal(
+            "https://images.igdb.com/igdb/image/upload/t_cover_big_2x/cover202.jpg",
+            description.CoverUrl);
+        Assert.Equal(
+            "https://images.igdb.com/igdb/image/upload/t_1080p/art202.jpg",
+            description.HeroUrl);
+        Assert.Equal(2, description.Screenshots.Count);
+        Assert.Equal(
+            "https://images.igdb.com/igdb/image/upload/t_cover_small_2x/cover202.jpg",
+            matches.Matches[1].CoverUrl);
         Assert.Equal(1, handler.TokenRequestCount);
         Assert.Equal(2, handler.GameQueries.Count);
         Assert.Contains("search \"Metadata Game\"", handler.GameQueries[0]);
@@ -386,7 +404,13 @@ public sealed class GameApiTests
                     202,
                     "The remastered description.",
                     "Metadata Game Remastered",
-                    "https://www.igdb.com/games/metadata-game-remastered")
+                    "https://www.igdb.com/games/metadata-game-remastered",
+                    "https://images.igdb.com/igdb/image/upload/t_cover_big_2x/cover-remastered.jpg",
+                    "https://images.igdb.com/igdb/image/upload/t_1080p/artwork-remastered.jpg",
+                    [
+                        new IgdbScreenshot("https://images.igdb.com/thumb-1.jpg", "https://images.igdb.com/full-1.jpg"),
+                        new IgdbScreenshot("https://images.igdb.com/thumb-2.jpg", "https://images.igdb.com/full-2.jpg")
+                    ])
                 : IgdbDescriptionResult.Available(
                     101,
                     $"{title} is a fetched description.",
@@ -407,7 +431,8 @@ public sealed class GameApiTests
                     202,
                     $"{title} Remastered",
                     2024,
-                    "https://www.igdb.com/games/metadata-game-remastered")
+                    "https://www.igdb.com/games/metadata-game-remastered",
+                    "https://images.igdb.com/igdb/image/upload/t_cover_small_2x/cover-remastered.jpg")
             ]));
     }
 
@@ -442,12 +467,23 @@ public sealed class GameApiTests
 
             return query.Contains("where id = 202", StringComparison.Ordinal)
                 ? JsonResponse("""
-                    [{"id":202,"name":"Metadata Game Remastered","summary":"The exact selected description.","slug":"metadata-game-remastered"}]
+                    [{
+                      "id":202,
+                      "name":"Metadata Game Remastered",
+                      "summary":"The exact selected description.",
+                      "slug":"metadata-game-remastered",
+                      "cover":{"image_id":"cover202"},
+                      "artworks":[{"image_id":"art202","width":1920,"height":1080}],
+                      "screenshots":[
+                        {"image_id":"shot202a","width":1920,"height":1080},
+                        {"image_id":"shot202b","width":1920,"height":1080}
+                      ]
+                    }]
                     """)
                 : JsonResponse("""
                     [
-                      {"id":101,"name":"Metadata Game","first_release_date":1577836800,"slug":"metadata-game"},
-                      {"id":202,"name":"Metadata Game Remastered","first_release_date":1704067200,"slug":"metadata-game-remastered"}
+                      {"id":101,"name":"Metadata Game","first_release_date":1577836800,"slug":"metadata-game","cover":{"image_id":"cover101"}},
+                      {"id":202,"name":"Metadata Game Remastered","first_release_date":1704067200,"slug":"metadata-game-remastered","cover":{"image_id":"cover202"}}
                     ]
                     """);
         }
