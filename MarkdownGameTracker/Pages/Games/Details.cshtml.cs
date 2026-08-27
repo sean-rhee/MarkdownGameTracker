@@ -7,7 +7,10 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace MarkdownGameTracker.Pages.Games;
 
-public sealed class DetailsModel(IGameRepository repository, MarkdownRenderer markdownRenderer) : PageModel
+public sealed class DetailsModel(
+    IGameRepository repository,
+    IGameMetadataService metadataService,
+    MarkdownRenderer markdownRenderer) : PageModel
 {
     private static readonly HashSet<string> PrimaryFields = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -47,6 +50,51 @@ public sealed class DetailsModel(IGameRepository repository, MarkdownRenderer ma
 
         TempData["SuccessMessage"] = $"Deleted {id}.";
         return RedirectToPage("/Index");
+    }
+
+    public async Task<IActionResult> OnPostChangeStatusAsync(
+        string id,
+        string status,
+        CancellationToken cancellationToken)
+    {
+        if (!GameStatuses.TryNormalize(status, out var normalizedStatus))
+        {
+            return BadRequest();
+        }
+
+        var game = await metadataService.ChangeStatusAsync(id, normalizedStatus, cancellationToken);
+        if (game is null)
+        {
+            return NotFound();
+        }
+
+        SuccessMessage = $"Changed the status to {GameStatuses.GetLabel(normalizedStatus)}.";
+        return RedirectToPage(new { id = game.Id });
+    }
+
+    public async Task<IActionResult> OnPostChangeRatingAsync(
+        string id,
+        decimal? rating,
+        bool clear,
+        CancellationToken cancellationToken)
+    {
+        if (!clear && (rating is null or < 0 or > 10))
+        {
+            return BadRequest();
+        }
+
+        var game = clear
+            ? await metadataService.ClearRatingAsync(id, cancellationToken)
+            : await metadataService.SetRatingAsync(id, rating!.Value, cancellationToken);
+        if (game is null)
+        {
+            return NotFound();
+        }
+
+        SuccessMessage = clear
+            ? "Cleared the rating."
+            : $"Changed the rating to {game.Rating} out of 10.";
+        return RedirectToPage(new { id = game.Id });
     }
 
     public static string FormatFrontmatterValue(object? value)

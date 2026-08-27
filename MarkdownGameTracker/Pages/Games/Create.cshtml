@@ -19,7 +19,27 @@
 
         <div class="form-field">
             <label asp-for="Input.Title"></label>
-            <input asp-for="Input.Title" class="form-control form-control-lg" autofocus placeholder="e.g. Hollow Knight" />
+            <div class="game-title-combobox"
+                 data-game-title-suggestions
+                 data-suggestions-url="/api/games/igdb-title-suggestions">
+                <input asp-for="Input.Title"
+                       class="form-control form-control-lg"
+                       autofocus
+                       placeholder="e.g. Hollow Knight"
+                       autocomplete="off"
+                       role="combobox"
+                       aria-autocomplete="list"
+                       aria-controls="gameTitleSuggestions"
+                       aria-describedby="gameTitleSuggestionHelp"
+                       aria-expanded="false" />
+                <ul id="gameTitleSuggestions"
+                    class="game-title-suggestions"
+                    role="listbox"
+                    aria-label="IGDB game suggestions"
+                    hidden></ul>
+            </div>
+            <span id="gameTitleSuggestionHelp" class="field-help game-title-suggestion-help">Search IGDB as you type.</span>
+            <span class="visually-hidden" role="status" aria-live="polite" data-game-title-suggestion-status></span>
             <span asp-validation-for="Input.Title" class="field-validation-error"></span>
         </div>
 
@@ -56,4 +76,5 @@
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
     <script src="~/js/markdown-editor.js" asp-append-version="true"></script>
+    <script src="~/js/game-title-suggestions.js" asp-append-version="true"></script>
 }

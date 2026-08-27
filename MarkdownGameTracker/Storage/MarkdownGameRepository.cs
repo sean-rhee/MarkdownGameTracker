@@ -1,9 +1,7 @@
 using System.Globalization;
 using System.Text;
-using System.Text.Json;
 using MarkdownGameTracker.Models;
 using Microsoft.Extensions.Options;
-using YamlDotNet.Serialization;
 
 namespace MarkdownGameTracker.Storage;
 
@@ -20,12 +18,14 @@ public sealed class MarkdownGameRepository : IGameRepository
     };
 
     private readonly string _gamesDirectory;
-    private readonly IDeserializer _deserializer;
-    private readonly ISerializer _serializer;
+    private readonly GameNoteDocumentSerializer _documentSerializer;
     private readonly SemaphoreSlim _writeLock = new(1, 1);
 
-    public MarkdownGameRepository(IOptions<VaultOptions> options)
+    public MarkdownGameRepository(
+        IOptions<VaultOptions> options,
+        GameNoteDocumentSerializer documentSerializer)
     {
+        _documentSerializer = documentSerializer;
         var vaultOptions = options.Value;
         var vaultPath = Path.GetFullPath(vaultOptions.Path);
         _gamesDirectory = Path.GetFullPath(Path.Combine(vaultPath, vaultOptions.GamesDirectory));
@@ -39,8 +39,6 @@ public sealed class MarkdownGameRepository : IGameRepository
         }
 
         Directory.CreateDirectory(_gamesDirectory);
-        _deserializer = new DeserializerBuilder().Build();
-        _serializer = new SerializerBuilder().Build();
     }
 
     public async Task<IReadOnlyList<GameNote>> ListAsync(
@@ -181,7 +179,7 @@ public sealed class MarkdownGameRepository : IGameRepository
                     }
                     else
                     {
-                        mergedFrontmatter[pair.Key] = NormalizeValue(pair.Value);
+                        mergedFrontmatter[pair.Key] = _documentSerializer.NormalizeValue(pair.Value);
                     }
                 }
             }
@@ -243,7 +241,7 @@ public sealed class MarkdownGameRepository : IGameRepository
     private async Task<GameNote> ReadAsync(string filePath, CancellationToken cancellationToken)
     {
         var contents = await File.ReadAllTextAsync(filePath, cancellationToken);
-        var (frontmatter, markdown) = ParseDocument(contents, filePath);
+        var (frontmatter, markdown) = _documentSerializer.Parse(contents, filePath);
         var title = Path.GetFileNameWithoutExtension(filePath);
 
         return new GameNote(
@@ -256,63 +254,13 @@ public sealed class MarkdownGameRepository : IGameRepository
             new DateTimeOffset(File.GetLastWriteTimeUtc(filePath)));
     }
 
-    private (Dictionary<string, object?> Frontmatter, string Markdown) ParseDocument(
-        string contents,
-        string filePath)
-    {
-        var normalized = contents.TrimStart('\uFEFF').Replace("\r\n", "\n", StringComparison.Ordinal);
-        if (!normalized.StartsWith("---\n", StringComparison.Ordinal))
-        {
-            return (new Dictionary<string, object?>(StringComparer.Ordinal), normalized);
-        }
-
-        var closingDelimiter = normalized.IndexOf("\n---\n", 4, StringComparison.Ordinal);
-        var markdownStart = closingDelimiter >= 0 ? closingDelimiter + 5 : normalized.Length;
-
-        if (closingDelimiter < 0 && normalized.EndsWith("\n---", StringComparison.Ordinal))
-        {
-            closingDelimiter = normalized.Length - 4;
-        }
-
-        if (closingDelimiter < 0)
-        {
-            throw new InvalidDataException($"The note '{Path.GetFileName(filePath)}' has unclosed YAML frontmatter.");
-        }
-
-        var yaml = normalized[4..closingDelimiter];
-        var markdown = normalized[markdownStart..];
-
-        try
-        {
-            var raw = string.IsNullOrWhiteSpace(yaml)
-                ? new Dictionary<object, object?>()
-                : _deserializer.Deserialize<Dictionary<object, object?>>(yaml)
-                    ?? new Dictionary<object, object?>();
-
-            return (NormalizeDictionary(raw), markdown);
-        }
-        catch (Exception exception) when (exception is not InvalidDataException)
-        {
-            throw new InvalidDataException(
-                $"The note '{Path.GetFileName(filePath)}' contains invalid YAML frontmatter.",
-                exception);
-        }
-    }
-
     private async Task WriteAtomicallyAsync(
         string destinationPath,
         Dictionary<string, object?> frontmatter,
         string markdown,
         CancellationToken cancellationToken)
     {
-        var yaml = _serializer.Serialize(frontmatter).TrimEnd();
-        var normalizedMarkdown = markdown.Replace("\r\n", "\n", StringComparison.Ordinal).TrimStart('\n');
-        var document = new StringBuilder()
-            .AppendLine("---")
-            .AppendLine(yaml)
-            .AppendLine("---")
-            .Append(normalizedMarkdown)
-            .ToString();
+        var document = _documentSerializer.Serialize(frontmatter, markdown);
 
         var temporaryPath = Path.Combine(
             _gamesDirectory,
@@ -392,7 +340,7 @@ public sealed class MarkdownGameRepository : IGameRepository
         }
     }
 
-    private static Dictionary<string, object?> PrepareFrontmatter(
+    private Dictionary<string, object?> PrepareFrontmatter(
         IReadOnlyDictionary<string, object?>? source,
         string? status,
         decimal? rating,
@@ -400,7 +348,7 @@ public sealed class MarkdownGameRepository : IGameRepository
     {
         var frontmatter = source?.ToDictionary(
                 pair => pair.Key,
-                pair => NormalizeValue(pair.Value),
+                pair => _documentSerializer.NormalizeValue(pair.Value),
                 StringComparer.Ordinal)
             ?? new Dictionary<string, object?>(StringComparer.Ordinal);
 
@@ -428,50 +376,6 @@ public sealed class MarkdownGameRepository : IGameRepository
         {
             frontmatter[key] = value;
         }
-    }
-
-    private static Dictionary<string, object?> NormalizeDictionary(
-        IDictionary<object, object?> source)
-    {
-        return source.ToDictionary(
-            pair => Convert.ToString(pair.Key, CultureInfo.InvariantCulture) ?? string.Empty,
-            pair => NormalizeValue(pair.Value),
-            StringComparer.Ordinal);
-    }
-
-    private static object? NormalizeValue(object? value)
-    {
-        return value switch
-        {
-            null => null,
-            JsonElement element => NormalizeJsonElement(element),
-            IDictionary<object, object?> dictionary => NormalizeDictionary(dictionary),
-            IDictionary<string, object?> dictionary => dictionary.ToDictionary(
-                pair => pair.Key,
-                pair => NormalizeValue(pair.Value),
-                StringComparer.Ordinal),
-            IEnumerable<object?> sequence when value is not string => sequence.Select(NormalizeValue).ToList(),
-            _ => value
-        };
-    }
-
-    private static object? NormalizeJsonElement(JsonElement element)
-    {
-        return element.ValueKind switch
-        {
-            JsonValueKind.Object => element.EnumerateObject().ToDictionary(
-                property => property.Name,
-                property => NormalizeJsonElement(property.Value),
-                StringComparer.Ordinal),
-            JsonValueKind.Array => element.EnumerateArray().Select(NormalizeJsonElement).ToList(),
-            JsonValueKind.String => element.GetString(),
-            JsonValueKind.Number when element.TryGetInt64(out var integer) => integer,
-            JsonValueKind.Number when element.TryGetDecimal(out var number) => number,
-            JsonValueKind.True => true,
-            JsonValueKind.False => false,
-            JsonValueKind.Null => null,
-            _ => element.GetRawText()
-        };
     }
 
     private static string? ReadString(

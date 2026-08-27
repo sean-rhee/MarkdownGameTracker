@@ -19,36 +19,11 @@
   const screenshotSection = mediaPanel.querySelector("[data-game-screenshots]");
   const screenshotGrid = mediaPanel.querySelector("[data-game-screenshot-grid]");
   const gameTitle = mediaPanel.dataset.gameTitle;
-  const storageKey = `game-garden:igdb-match:${card.dataset.gameId}`;
+  const gameId = card.dataset.gameId;
+  const selectionStore = window.GameGardenIgdbSelection;
   let matchesLoaded = false;
   let matchesLoading = false;
-  let selectedIgdbId = readStoredSelection();
-
-  function readStoredSelection() {
-    try {
-      const storedValue = window.localStorage.getItem(storageKey);
-      const parsedValue = Number.parseInt(storedValue, 10);
-      return Number.isSafeInteger(parsedValue) && parsedValue > 0 ? parsedValue : null;
-    } catch {
-      return null;
-    }
-  }
-
-  function storeSelection(igdbGameId) {
-    try {
-      window.localStorage.setItem(storageKey, String(igdbGameId));
-    } catch {
-      // The choice still applies for this page when browser storage is unavailable.
-    }
-  }
-
-  function clearStoredSelection() {
-    try {
-      window.localStorage.removeItem(storageKey);
-    } catch {
-      // Nothing else is required when browser storage is unavailable.
-    }
-  }
+  let selectedIgdbId = selectionStore.get(gameId);
 
   const showMessage = (message, state) => {
     body.textContent = message;
@@ -180,7 +155,7 @@
       const result = await response.json();
       if (igdbGameId && result.status === "notFound" && retryAutomatic) {
         selectedIgdbId = null;
-        clearStoredSelection();
+        selectionStore.clear(gameId);
         await loadDescription(null, false);
         return;
       }
@@ -203,7 +178,7 @@
 
   const chooseMatch = async (candidate) => {
     selectedIgdbId = candidate.igdbGameId;
-    storeSelection(selectedIgdbId);
+    selectionStore.set(gameId, selectedIgdbId);
     matchPicker.hidden = true;
     matchToggle.setAttribute("aria-expanded", "false");
     matchToggle.textContent = "Choose another match";

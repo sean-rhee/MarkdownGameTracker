@@ -1,0 +1,270 @@
+html[data-theme="dark"] body {
+  background:
+    radial-gradient(circle at 8% 8%, rgba(111, 169, 216, 0.14), transparent 24rem),
+    var(--background);
+}
+
+html[data-theme="dark"] a {
+  color: #8fc8f2;
+}
+
+html[data-theme="dark"] a:hover {
+  color: #b9ddf8;
+}
+
+html[data-theme="dark"] .site-header {
+  background: rgba(15, 30, 45, 0.92);
+  border-bottom-color: rgba(128, 185, 230, 0.2);
+}
+
+html[data-theme="dark"] .brand-mark {
+  color: #102538;
+  border-color: rgba(255, 255, 255, 0.13);
+}
+
+html[data-theme="dark"] .nav-link:hover,
+html[data-theme="dark"] .nav-link:focus {
+  background: rgba(111, 169, 216, 0.17);
+}
+
+html[data-theme="dark"] .theme-toggle {
+  border-color: #35556e;
+  background: #1b354b;
+}
+
+html[data-theme="dark"] .hero-panel {
+  border-color: #31536d;
+  background: linear-gradient(125deg, #294e6b, #1d3b53 68%, #172f43);
+}
+
+html[data-theme="dark"] .hero-panel p,
+html[data-theme="dark"] .markdown-body {
+  color: #bdd2e4;
+}
+
+html[data-theme="dark"] .hero-panel .btn-primary {
+  color: var(--ink);
+  border-color: #38566d;
+  background: var(--surface);
+}
+
+html[data-theme="dark"] .btn-primary {
+  color: #102538;
+  border-color: #7db5df;
+}
+
+html[data-theme="dark"] .btn-primary:hover,
+html[data-theme="dark"] .btn-primary:focus,
+html[data-theme="dark"] .btn-primary:active {
+  color: #102538 !important;
+}
+
+html[data-theme="dark"] .btn-secondary {
+  border-color: #3c617c;
+}
+
+html[data-theme="dark"] .btn-danger-soft {
+  color: #f0a7b4;
+  border-color: #754250;
+  background: #432733;
+}
+
+html[data-theme="dark"] .stat-card {
+  background: rgba(23, 43, 62, 0.86);
+}
+
+html[data-theme="dark"] .status-tab:hover {
+  background: rgba(111, 169, 216, 0.12);
+}
+
+html[data-theme="dark"] .status-tab.active {
+  border-color: #3c617c;
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.18);
+}
+
+html[data-theme="dark"] .status-tab-count {
+  color: #c2ddf2;
+}
+
+html[data-theme="dark"] .status-tab.active .status-tab-count,
+html[data-theme="dark"] .btn-primary {
+  color: #102538;
+}
+
+html[data-theme="dark"] .form-control,
+html[data-theme="dark"] .form-select {
+  color: var(--ink);
+  border-color: #36566f;
+  background-color: #13283a;
+}
+
+html[data-theme="dark"] .form-control::placeholder {
+  color: #7792aa;
+}
+
+html[data-theme="dark"] .search-suggestions {
+  border-color: #36566f;
+  background: #13283a;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
+}
+
+html[data-theme="dark"] .search-suggestions [role="option"]:hover,
+html[data-theme="dark"] .search-suggestions [role="option"].active {
+  background: #1d3b53;
+}
+
+html[data-theme="dark"] .game-title-suggestions {
+  border-color: #36566f;
+  background: #13283a;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.34);
+}
+
+html[data-theme="dark"] .game-title-suggestion:hover,
+html[data-theme="dark"] .game-title-suggestion.active {
+  background: #1d3b53;
+}
+
+html[data-theme="dark"] .game-title-suggestion-cover-placeholder {
+  color: #b9dcf5;
+  background: #1d3b53;
+}
+
+html[data-theme="dark"] .markdown-editor-shell {
+  border-color: #36566f;
+}
+
+html[data-theme="dark"] .markdown-toolbar,
+html[data-theme="dark"] .editor-view-switcher {
+  background: #13283a;
+}
+
+html[data-theme="dark"] .markdown-editor {
+  color: var(--ink);
+  background: #102538;
+}
+
+html[data-theme="dark"] .markdown-editor:focus {
+  background: #13283a;
+  box-shadow: inset 0 0 0 3px rgba(111, 169, 216, 0.35);
+}
+
+html[data-theme="dark"] .preview-error {
+  color: #f0a7b4;
+}
+
+html[data-theme="dark"] .game-card {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+}
+
+html[data-theme="dark"] .game-card-artwork,
+html[data-theme="dark"] .game-card-artwork[data-artwork-kind="cover"] {
+  border-color: #29465d;
+  background: linear-gradient(135deg, #17344b, #24567a);
+}
+
+html[data-theme="dark"] .status-option.current,
+html[data-theme="dark"] .status-option:disabled {
+  background: #13283a;
+}
+
+html[data-theme="dark"] .status-active {
+  color: #9ee4ca;
+  background: #19483c;
+}
+
+html[data-theme="dark"] .status-endless {
+  color: #9bddea;
+  background: #174754;
+}
+
+html[data-theme="dark"] .status-completed {
+  color: #c7c5ff;
+  background: #37366e;
+}
+
+html[data-theme="dark"] .status-planned,
+html[data-theme="dark"] .rating-pill {
+  color: #f1d984;
+  background: #56491e;
+}
+
+html[data-theme="dark"] .rating-unset {
+  color: #c1ccd5;
+  background: #35434f;
+}
+
+html[data-theme="dark"] .rating-menu {
+  background: var(--surface);
+}
+
+html[data-theme="dark"] .status-inactive {
+  color: #c1ccd5;
+  background: #35434f;
+}
+
+html[data-theme="dark"] .empty-state {
+  border-color: #41637d;
+  background: rgba(26, 52, 74, 0.45);
+}
+
+html[data-theme="dark"] .game-description-card {
+  background:
+    radial-gradient(circle at 100% 0, rgba(111, 169, 216, 0.18), transparent 22rem),
+    var(--surface);
+}
+
+html[data-theme="dark"] .igdb-badge {
+  color: #b9dcf5;
+  border-color: rgba(143, 197, 251, 0.24);
+  background: rgba(36, 70, 95, 0.8);
+}
+
+html[data-theme="dark"] .igdb-match-toggle {
+  color: #8fc8f2;
+}
+
+html[data-theme="dark"] .igdb-match-option {
+  background: rgba(23, 43, 62, 0.7);
+}
+
+html[data-theme="dark"] .igdb-match-option:hover,
+html[data-theme="dark"] .igdb-match-option:focus-visible,
+html[data-theme="dark"] .igdb-match-option[aria-current="true"] {
+  background: var(--blue-100);
+}
+
+html[data-theme="dark"] .game-hero-frame[data-has-hero="false"] .game-hero-overlay {
+  background:
+    radial-gradient(circle at 82% 15%, rgba(111, 169, 216, 0.2), transparent 18rem),
+    linear-gradient(125deg, var(--blue-200), var(--blue-100));
+}
+
+html[data-theme="dark"] .game-hero-frame[data-has-hero="false"] .game-artwork-credit {
+  color: var(--ink-soft);
+  background: rgba(15, 30, 45, 0.56);
+}
+
+html[data-theme="dark"] .metadata-card dl > div {
+  border-bottom-color: #29465d;
+}
+
+html[data-theme="dark"] .success-alert {
+  color: #a9dfcf;
+  border-color: #356657;
+  background: #1c4439;
+}
+
+html[data-theme="dark"] .validation-summary {
+  color: #f0a7b4;
+}
+
+html[data-theme="dark"] .validation-summary ul {
+  background: #432733;
+}
+
+.btn:focus-visible,
+.nav-link:focus-visible,
+a:focus-visible {
+  outline: 3px solid rgba(57, 127, 189, 0.45);
+  outline-offset: 2px;
+}

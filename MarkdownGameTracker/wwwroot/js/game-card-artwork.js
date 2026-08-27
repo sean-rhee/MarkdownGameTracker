@@ -11,15 +11,7 @@
     return;
   }
 
-  const selectedIgdbId = (gameId) => {
-    try {
-      const value = window.localStorage.getItem(`game-garden:igdb-match:${gameId}`);
-      const parsed = Number.parseInt(value ?? "", 10);
-      return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
-    } catch {
-      return null;
-    }
-  };
+  const selectionStore = window.GameGardenIgdbSelection;
 
   const safeArtworkUrl = (value) => {
     try {
@@ -63,7 +55,7 @@
       body: JSON.stringify({
         games: batch.map((card) => ({
           id: card.dataset.gameId,
-          igdbGameId: selectedIgdbId(card.dataset.gameId)
+          igdbGameId: selectionStore.get(card.dataset.gameId)
         }))
       })
     });

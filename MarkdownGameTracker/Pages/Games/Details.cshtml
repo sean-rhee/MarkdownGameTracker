@@ -13,11 +13,10 @@
     <div>
         <a class="back-link" asp-page="/Index">← Back to games</a>
         <div class="note-meta">
-            <span class="status-pill @IndexModel.GetStatusClass(Model.Game.Status)">@(Model.Game.Status is null ? "No status" : GameStatuses.GetLabel(Model.Game.Status))</span>
-            @if (Model.Game.Rating is not null)
-            {
-                <span class="rating-pill">★ @Model.Game.Rating / 10</span>
-            }
+            <partial name="_InlineStatusControl"
+                     model="@(new InlineStatusControlModel(Model.Game.Id, Model.Game.Status, "/Games/Details"))" />
+            <partial name="_InlineRatingControl"
+                     model="@(new InlineRatingControlModel(Model.Game.Id, Model.Game.Rating, "/Games/Details"))" />
         </div>
     </div>
     <div class="note-actions">
@@ -106,7 +105,12 @@
     <article class="note-card">
         <div class="note-card-heading">
             <span class="eyebrow">Markdown</span>
-            <span>Stored in Obsidian</span>
+            <div class="note-card-heading-actions">
+                <span class="note-storage-label">Stored in Obsidian</span>
+                <a class="btn btn-primary markdown-edit-link"
+                   asp-page="/Games/Edit"
+                   asp-route-id="@Model.Game.Id">Edit note</a>
+            </div>
         </div>
         @if (string.IsNullOrWhiteSpace(Model.Game.Markdown))
         {
@@ -131,11 +135,17 @@
             </div>
             <div>
                 <dt>Status</dt>
-                <dd>@(Model.Game.Status is null ? "—" : GameStatuses.GetLabel(Model.Game.Status))</dd>
+                <dd>
+                    <partial name="_InlineStatusControl"
+                             model="@(new InlineStatusControlModel(Model.Game.Id, Model.Game.Status, "/Games/Details"))" />
+                </dd>
             </div>
             <div>
                 <dt>Rating</dt>
-                <dd>@(Model.Game.Rating?.ToString() ?? "—")</dd>
+                <dd>
+                    <partial name="_InlineRatingControl"
+                             model="@(new InlineRatingControlModel(Model.Game.Id, Model.Game.Rating, "/Games/Details"))" />
+                </dd>
             </div>
             @foreach (var item in Model.ExtraFrontmatter)
             {

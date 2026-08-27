@@ -1,0 +1,39 @@
+@model InlineRatingControlModel
+
+<div class="dropdown rating-dropdown inline-metadata-control">
+    <button class="rating-pill rating-button dropdown-toggle @(Model.Rating is null ? "rating-unset" : null)"
+            type="button"
+            data-bs-toggle="dropdown"
+            data-bs-auto-close="outside"
+            aria-expanded="false"
+            aria-label="Change rating for @Model.GameId">
+        @(Model.Rating is null ? "☆ Not rated" : $"★ {Model.Rating} / 10")
+    </button>
+    <div class="dropdown-menu rating-menu">
+        <form method="post"
+              asp-page="@Model.Page"
+              asp-page-handler="ChangeRating"
+              asp-route-id="@Model.GameId">
+            <input type="hidden" name="currentStatus" value="@Model.ReturnStatus" />
+            <input type="hidden" name="search" value="@Model.Search" />
+            <label class="form-label rating-input-label">
+                <span>Rating out of 10</span>
+                <input class="form-control"
+                       name="rating"
+                       type="number"
+                       min="0"
+                       max="10"
+                       step="0.5"
+                       value="@Model.Rating"
+                       placeholder="0–10" />
+            </label>
+            <div class="rating-menu-actions">
+                <button class="btn btn-primary btn-sm" type="submit">Save</button>
+                @if (Model.Rating is not null)
+                {
+                    <button class="btn btn-link btn-sm" type="submit" name="clear" value="true">Clear</button>
+                }
+            </div>
+        </form>
+    </div>
+</div>

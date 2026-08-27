@@ -1,0 +1,39 @@
+@model InlineStatusControlModel
+@{
+    var statusLabel = Model.Status is null ? "No status" : GameStatuses.GetLabel(Model.Status);
+}
+
+<div class="dropdown status-dropdown inline-metadata-control">
+    <button class="status-pill status-button @IndexModel.GetStatusClass(Model.Status) dropdown-toggle"
+            type="button"
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+            aria-label="Change status for @Model.GameId">
+        @statusLabel
+    </button>
+    <form method="post"
+          asp-page="@Model.Page"
+          asp-page-handler="ChangeStatus"
+          asp-route-id="@Model.GameId"
+          class="dropdown-menu status-menu status-menu-form">
+        <span class="dropdown-header">Move to</span>
+        <input type="hidden" name="currentStatus" value="@Model.ReturnStatus" />
+        <input type="hidden" name="search" value="@Model.Search" />
+        @foreach (var status in GameStatuses.All)
+        {
+            var isCurrentStatus = string.Equals(Model.Status, status, StringComparison.OrdinalIgnoreCase);
+                <button class="dropdown-item status-option @(isCurrentStatus ? "current" : null)"
+                        type="submit"
+                        name="status"
+                        value="@status"
+                        disabled="@(isCurrentStatus ? "disabled" : null)">
+                    <span class="status-option-dot @IndexModel.GetStatusClass(status)" aria-hidden="true"></span>
+                    <span>@GameStatuses.GetLabel(status)</span>
+                    @if (isCurrentStatus)
+                    {
+                        <span class="status-check" aria-hidden="true">✓</span>
+                    }
+                </button>
+        }
+    </form>
+</div>

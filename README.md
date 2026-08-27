@@ -52,6 +52,16 @@ dotnet run --project .\MarkdownGameTracker\MarkdownGameTracker.csproj
 
 `Vault__GamesDirectory` defaults to `Games` and must resolve inside the vault.
 
+For local development, .NET user secrets keep the vault path and IGDB credentials out of tracked files:
+
+```powershell
+dotnet user-secrets --project MarkdownGameTracker set "Vault:Path" "C:\path\to\your\vault"
+dotnet user-secrets --project MarkdownGameTracker set "IGDB:ClientId" "your-client-id"
+dotnet user-secrets --project MarkdownGameTracker set "IGDB:ClientSecret" "your-client-secret"
+```
+
+Environment variables remain the preferred option for Docker and deployed environments.
+
 ### IGDB descriptions
 
 Create a Twitch developer application, then provide its client ID and client secret. The app exchanges those credentials for an app access token on the server; the secret is never sent to the browser.

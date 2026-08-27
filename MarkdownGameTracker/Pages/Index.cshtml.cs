@@ -1,11 +1,14 @@
 using MarkdownGameTracker.Models;
+using MarkdownGameTracker.Services;
 using MarkdownGameTracker.Storage;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace MarkdownGameTracker.Pages;
 
-public sealed class IndexModel(IGameRepository repository) : PageModel
+public sealed class IndexModel(
+    IGameRepository repository,
+    IGameMetadataService metadataService) : PageModel
 {
     [BindProperty(SupportsGet = true)]
     public string? Search { get; set; }
@@ -16,6 +19,8 @@ public sealed class IndexModel(IGameRepository repository) : PageModel
     public string SelectedStatus { get; private set; } = GameStatuses.Active;
 
     public IReadOnlyList<GameNote> Games { get; private set; } = [];
+
+    public IReadOnlyList<string> SearchSuggestions { get; private set; } = [];
 
     public IReadOnlyList<StatusTab> StatusTabs { get; private set; } = [];
 
@@ -31,6 +36,15 @@ public sealed class IndexModel(IGameRepository repository) : PageModel
 
         var allGames = await repository.ListAsync(null, null, cancellationToken);
         Games = await repository.ListAsync(SelectedStatus, Search, cancellationToken);
+        SearchSuggestions = allGames
+            .Where(game => string.Equals(
+                game.Status,
+                SelectedStatus,
+                StringComparison.OrdinalIgnoreCase))
+            .Select(game => game.Title)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(title => title, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
         StatusTabs = GameStatuses.All
             .Select(status => new StatusTab(
                 status,
@@ -54,10 +68,7 @@ public sealed class IndexModel(IGameRepository repository) : PageModel
             return BadRequest();
         }
 
-        var game = await repository.UpdateAsync(
-            id,
-            new UpdateGameRequest(null, normalizedStatus, null, null, null),
-            cancellationToken);
+        var game = await metadataService.ChangeStatusAsync(id, normalizedStatus, cancellationToken);
 
         if (game is null)
         {
@@ -65,6 +76,42 @@ public sealed class IndexModel(IGameRepository repository) : PageModel
         }
 
         SuccessMessage = $"Moved {game.Title} to {GameStatuses.GetLabel(normalizedStatus)}.";
+        var returnStatus = GameStatuses.TryNormalize(currentStatus, out var normalizedCurrentStatus)
+            ? normalizedCurrentStatus
+            : GameStatuses.Active;
+
+        return RedirectToPage(new
+        {
+            status = returnStatus,
+            search
+        });
+    }
+
+    public async Task<IActionResult> OnPostChangeRatingAsync(
+        string id,
+        decimal? rating,
+        bool clear,
+        string? currentStatus,
+        string? search,
+        CancellationToken cancellationToken)
+    {
+        if (!clear && (rating is null or < 0 or > 10))
+        {
+            return BadRequest();
+        }
+
+        var game = clear
+            ? await metadataService.ClearRatingAsync(id, cancellationToken)
+            : await metadataService.SetRatingAsync(id, rating!.Value, cancellationToken);
+
+        if (game is null)
+        {
+            return NotFound();
+        }
+
+        SuccessMessage = clear
+            ? $"Cleared the rating for {game.Title}."
+            : $"Rated {game.Title} {game.Rating} out of 10.";
         var returnStatus = GameStatuses.TryNormalize(currentStatus, out var normalizedCurrentStatus)
             ? normalizedCurrentStatus
             : GameStatuses.Active;

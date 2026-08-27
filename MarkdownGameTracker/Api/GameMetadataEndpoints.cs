@@ -9,6 +9,17 @@ public static class GameMetadataEndpoints
     public static IEndpointRouteBuilder MapGameMetadataEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet(
+                "/api/games/igdb-title-suggestions",
+                SearchIgdbTitleSuggestionsAsync)
+            .WithTags("Game Metadata")
+            .WithName("SearchIgdbGameTitleSuggestions")
+            .WithSummary("Suggest IGDB game titles")
+            .WithDescription("Returns likely IGDB matches for a partial title while creating a game note.")
+            .Produces<IgdbMatchSearchResult>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status499ClientClosedRequest)
+            .ProducesValidationProblem();
+
+        endpoints.MapGet(
                 "/api/games/{id}/igdb-description",
                 async (
                     [Description("Game-note filename without the .md extension.")] string id,
@@ -143,6 +154,34 @@ public static class GameMetadataEndpoints
             .ProducesValidationProblem();
 
         return endpoints;
+    }
+
+    internal static async Task<IResult> SearchIgdbTitleSuggestionsAsync(
+        [Description("Partial game title to search for on IGDB.")] string? query,
+        IIgdbDescriptionService igdb,
+        CancellationToken cancellationToken)
+    {
+        var normalizedQuery = query?.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedQuery)
+            || normalizedQuery.Length is < 2 or > 200)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["query"] = ["Enter between 2 and 200 characters."]
+            });
+        }
+
+        try
+        {
+            var result = await igdb.SearchMatchesAsync(normalizedQuery, cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Rapid edits intentionally cancel stale browser requests. Treat that as a closed request,
+            // not as an IGDB failure or an unhandled server exception.
+            return Results.StatusCode(StatusCodes.Status499ClientClosedRequest);
+        }
     }
 }
 

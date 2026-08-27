@@ -29,9 +29,15 @@ builder.Services
     .AddOptions<IgdbOptions>()
     .Bind(builder.Configuration.GetSection(IgdbOptions.SectionName));
 builder.Services.AddMemoryCache();
-builder.Services.AddHttpClient<IIgdbDescriptionService, IgdbDescriptionService>(client =>
+builder.Services.AddHttpClient(IgdbAccessTokenProvider.HttpClientName, client =>
     client.Timeout = TimeSpan.FromSeconds(12));
+builder.Services.AddSingleton<IIgdbAccessTokenProvider, IgdbAccessTokenProvider>();
+builder.Services.AddHttpClient<IIgdbApiClient, IgdbApiClient>(client =>
+    client.Timeout = TimeSpan.FromSeconds(12));
+builder.Services.AddTransient<IIgdbDescriptionService, IgdbDescriptionService>();
+builder.Services.AddSingleton<GameNoteDocumentSerializer>();
 builder.Services.AddSingleton<IGameRepository, MarkdownGameRepository>();
+builder.Services.AddSingleton<IGameMetadataService, GameMetadataService>();
 builder.Services.AddSingleton<MarkdownRenderer>();
 
 var app = builder.Build();
