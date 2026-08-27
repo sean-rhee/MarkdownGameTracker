@@ -939,6 +939,82 @@ html[data-theme="dark"] .theme-icon-sun {
   gap: 0.65rem;
 }
 
+.game-description-card {
+  margin-bottom: 1.15rem;
+  padding: clamp(1.3rem, 3vw, 1.8rem);
+  overflow: hidden;
+  border: 1px solid rgba(82, 141, 192, 0.28);
+  border-radius: var(--radius-md);
+  background:
+    radial-gradient(circle at 100% 0, rgba(179, 217, 255, 0.58), transparent 22rem),
+    var(--surface);
+  box-shadow: 0 7px 22px rgba(69, 116, 158, 0.07);
+}
+
+.game-description-heading,
+.game-description-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.game-description-heading h2 {
+  margin: 0;
+  font-size: clamp(1.35rem, 3vw, 1.65rem);
+}
+
+.game-description-heading .eyebrow {
+  margin-bottom: 0.35rem;
+}
+
+.igdb-badge {
+  padding: 0.35rem 0.65rem;
+  border: 1px solid rgba(57, 127, 189, 0.24);
+  border-radius: 999px;
+  color: #2e6f9f;
+  background: rgba(214, 235, 255, 0.72);
+  font-size: 0.7rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+}
+
+.game-description-body {
+  max-width: 960px;
+  margin-top: 1rem;
+  color: var(--ink-soft);
+  line-height: 1.72;
+}
+
+.game-description-body p,
+.game-description-body:last-child {
+  margin-bottom: 0;
+}
+
+.description-placeholder {
+  opacity: 0.78;
+}
+
+.game-description-card[data-description-state="not-configured"] .game-description-body,
+.game-description-card[data-description-state="not-found"] .game-description-body,
+.game-description-card[data-description-state="unavailable"] .game-description-body {
+  font-style: italic;
+}
+
+.game-description-footer {
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  color: var(--ink-soft);
+  border-top: 1px solid var(--border);
+  font-size: 0.78rem;
+}
+
+.game-description-footer a {
+  flex: 0 0 auto;
+  font-weight: 700;
+  text-decoration: none;
+}
+
 .note-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 290px;
@@ -1334,6 +1410,18 @@ html[data-theme="dark"] .empty-state {
   background: rgba(26, 52, 74, 0.45);
 }
 
+html[data-theme="dark"] .game-description-card {
+  background:
+    radial-gradient(circle at 100% 0, rgba(111, 169, 216, 0.18), transparent 22rem),
+    var(--surface);
+}
+
+html[data-theme="dark"] .igdb-badge {
+  color: #b9dcf5;
+  border-color: rgba(143, 197, 251, 0.24);
+  background: rgba(36, 70, 95, 0.8);
+}
+
 html[data-theme="dark"] .metadata-card dl div {
   border-bottom-color: #29465d;
 }
@@ -1463,6 +1551,12 @@ a:focus-visible {
 
   .note-actions .btn {
     flex: 1;
+  }
+
+  .game-description-heading,
+  .game-description-footer {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .site-footer .container {

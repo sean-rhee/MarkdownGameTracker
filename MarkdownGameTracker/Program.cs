@@ -25,6 +25,12 @@ builder.Services
     .Validate(options => !string.IsNullOrWhiteSpace(options.Path),
         "Vault:Path must point to the Obsidian vault.")
     .ValidateOnStart();
+builder.Services
+    .AddOptions<IgdbOptions>()
+    .Bind(builder.Configuration.GetSection(IgdbOptions.SectionName));
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpClient<IIgdbDescriptionService, IgdbDescriptionService>(client =>
+    client.Timeout = TimeSpan.FromSeconds(12));
 builder.Services.AddSingleton<IGameRepository, MarkdownGameRepository>();
 builder.Services.AddSingleton<MarkdownRenderer>();
 
@@ -56,6 +62,7 @@ app.MapStaticAssets();
 app.MapRazorPages()
    .WithStaticAssets();
 app.MapGameEndpoints();
+app.MapGameMetadataEndpoints();
 app.MapMarkdownEndpoints();
 
 app.Run();

@@ -12,6 +12,7 @@ The root page at [`http://localhost:5297/`](http://localhost:5297/) is a respons
 - Clickable status badges for moving a game between statuses directly from its card
 - A day/night theme toggle that follows the device preference and remembers your choice
 - Game details and frontmatter display
+- An IGDB-powered game description on each details page, fetched separately and never written into the note
 - Formatted Markdown viewing with headings, lists, tables, task lists, links, quotes, and code blocks
 - A split Write/Preview editor with formatting controls and keyboard shortcuts
 - Create and edit forms that write through the same Markdown repository as the API
@@ -28,6 +29,7 @@ In development, interactive Swagger documentation is available at [`/swagger`](h
 | --- | --- | --- |
 | `GET` | `/api/games?status=active&search=term` | List, filter, and search games |
 | `GET` | `/api/games/{id}` | Read one game by filename without `.md` |
+| `GET` | `/api/games/{id}/igdb-description` | Fetch a read-only game description from IGDB |
 | `POST` | `/api/games` | Create a game note |
 | `PUT` | `/api/games/{id}` | Update fields or rename a game note |
 | `DELETE` | `/api/games/{id}` | Permanently delete a game note |
@@ -48,6 +50,19 @@ dotnet run --project .\MarkdownGameTracker\MarkdownGameTracker.csproj
 
 `Vault__GamesDirectory` defaults to `Games` and must resolve inside the vault.
 
+### IGDB descriptions
+
+Create a Twitch developer application, then provide its client ID and client secret. The app exchanges those credentials for an app access token on the server; the secret is never sent to the browser.
+
+For local development, set these environment variables before starting the app:
+
+```powershell
+$env:IGDB__ClientId = "your-client-id"
+$env:IGDB__ClientSecret = "your-client-secret"
+```
+
+Opening a game's details page then loads its IGDB description asynchronously. Results are cached in memory, and neither the description nor any IGDB identifier is added to the Markdown file. Without credentials, the rest of the details page continues to work and shows a setup message in the description panel.
+
 ## Docker
 
 Docker needs both pieces of configuration:
@@ -66,6 +81,8 @@ On Windows with Docker Desktop, `.env` can use forward slashes:
 ```dotenv
 OBSIDIAN_VAULT_PATH=C:/Users/you/path/to/Obsidian/Vault
 GAME_TRACKER_PORT=5297
+IGDB_CLIENT_ID=your-client-id
+IGDB_CLIENT_SECRET=your-client-secret
 ```
 
 Then build and start the app:

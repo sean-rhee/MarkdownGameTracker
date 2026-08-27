@@ -3,10 +3,12 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using MarkdownGameTracker.Models;
+using MarkdownGameTracker.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Xunit;
 
@@ -42,6 +44,8 @@ public sealed class GameApiTests
         Assert.Contains("status-tabs", homeHtml);
         Assert.Contains("#b3d9ff", homeHtml, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("<h2", detailsHtml);
+        Assert.Contains("data-game-description", detailsHtml);
+        Assert.Contains("not stored in your note", detailsHtml);
         Assert.Contains("<strong>lovely</strong>", detailsHtml);
         Assert.DoesNotContain("<script>alert('nope')</script>", detailsHtml, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-markdown-editor", createHtml);
@@ -119,10 +123,34 @@ public sealed class GameApiTests
         Assert.True(paths.GetProperty("/api/games/{id}").TryGetProperty("get", out _));
         Assert.True(paths.GetProperty("/api/games/{id}").TryGetProperty("put", out _));
         Assert.True(paths.GetProperty("/api/games/{id}").TryGetProperty("delete", out _));
+        Assert.True(paths.GetProperty("/api/games/{id}/igdb-description").TryGetProperty("get", out _));
         Assert.True(paths.GetProperty("/api/markdown/preview").TryGetProperty("post", out _));
 
         var swaggerHtml = await swaggerResponse.Content.ReadAsStringAsync();
         Assert.Contains("id=\"swagger-ui\"", swaggerHtml, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Igdb_description_is_loaded_separately_without_changing_the_note()
+    {
+        using var app = new TestApp();
+        const string originalNote = "---\ntype: game\nstatus: active\n---\n## Personal notes\nDo not change me.";
+        app.WriteGame("Metadata Game", originalNote);
+
+        var detailsHtml = await app.Client.GetStringAsync("/Games/Details/Metadata%20Game");
+        var result = await app.Client.GetFromJsonAsync<IgdbDescriptionResult>(
+            "/api/games/Metadata%20Game/igdb-description");
+
+        Assert.Contains("/api/games/Metadata%20Game/igdb-description", detailsHtml);
+        Assert.DoesNotContain("Metadata Game is a fetched description.", detailsHtml);
+        Assert.NotNull(result);
+        Assert.Equal(IgdbDescriptionResult.AvailableStatus, result.Status);
+        Assert.Equal("Metadata Game is a fetched description.", result.Description);
+        Assert.Equal("Metadata Game", result.MatchedTitle);
+        Assert.Equal(originalNote, await File.ReadAllTextAsync(app.GamePath("Metadata Game")));
+
+        var missingResponse = await app.Client.GetAsync("/api/games/Missing/igdb-description");
+        Assert.Equal(HttpStatusCode.NotFound, missingResponse.StatusCode);
     }
 
     [Fact]
@@ -271,7 +299,11 @@ public sealed class GameApiTests
                     builder.UseSetting("Vault:GamesDirectory", "Games");
                     builder.ConfigureLogging(logging => logging.ClearProviders());
                     builder.ConfigureServices(services =>
-                        services.AddDataProtection().UseEphemeralDataProtectionProvider());
+                    {
+                        services.AddDataProtection().UseEphemeralDataProtectionProvider();
+                        services.RemoveAll<IIgdbDescriptionService>();
+                        services.AddSingleton<IIgdbDescriptionService, FakeIgdbDescriptionService>();
+                    });
                 });
             Client = _factory.CreateClient();
         }
@@ -290,5 +322,16 @@ public sealed class GameApiTests
             _factory.Dispose();
             Directory.Delete(RootPath, recursive: true);
         }
+    }
+
+    private sealed class FakeIgdbDescriptionService : IIgdbDescriptionService
+    {
+        public Task<IgdbDescriptionResult> GetDescriptionAsync(
+            string title,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(IgdbDescriptionResult.Available(
+                $"{title} is a fetched description.",
+                title,
+                "https://www.igdb.com/games/metadata-game"));
     }
 }

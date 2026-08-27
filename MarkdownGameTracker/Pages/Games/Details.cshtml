@@ -28,6 +28,26 @@
     </div>
 </div>
 
+<section class="game-description-card"
+         aria-labelledby="gameDescriptionHeading"
+         data-game-description
+         data-description-url="/api/games/@Uri.EscapeDataString(Model.Game.Id)/igdb-description">
+    <div class="game-description-heading">
+        <div>
+            <span class="eyebrow">Game overview</span>
+            <h2 id="gameDescriptionHeading">About the game</h2>
+        </div>
+        <span class="igdb-badge">IGDB</span>
+    </div>
+    <div class="game-description-body" data-description-body role="status" aria-live="polite">
+        <p class="description-placeholder">Looking up a description…</p>
+    </div>
+    <div class="game-description-footer" data-description-footer hidden>
+        <span data-description-match>Fetched live · not stored in your note</span>
+        <a data-description-source target="_blank" rel="noopener noreferrer">View on IGDB ↗</a>
+    </div>
+</section>
+
 <div class="note-layout">
     <article class="note-card">
         <div class="note-card-heading">
@@ -94,3 +114,7 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script src="~/js/game-description.js" asp-append-version="true"></script>
+}
