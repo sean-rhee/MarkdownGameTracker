@@ -55,6 +55,8 @@ public sealed class FrontendTests
         Assert.Contains("<h2", detailsHtml);
         Assert.Contains("data-game-description", detailsHtml);
         Assert.Contains("data-game-media", detailsHtml);
+        Assert.Contains("data-game-media-collection", detailsHtml);
+        Assert.Contains("game-details-strip", detailsHtml);
         Assert.Contains("game-hero-title", detailsHtml);
         Assert.Contains("data-has-hero=\"false\"", detailsHtml);
         Assert.Contains("data-game-screenshot-viewer", detailsHtml);
@@ -62,7 +64,11 @@ public sealed class FrontendTests
         Assert.Contains("data-screenshot-next", detailsHtml);
         Assert.Contains("data-screenshot-counter", detailsHtml);
         Assert.Contains("data-game-video", detailsHtml);
-        Assert.Contains("data-game-video-frame", detailsHtml);
+        Assert.Contains("data-game-video-carousel", detailsHtml);
+        Assert.Contains("data-video-count", detailsHtml);
+        Assert.True(
+            detailsHtml.IndexOf("data-game-video", StringComparison.Ordinal)
+            < detailsHtml.IndexOf("data-game-screenshots", StringComparison.Ordinal));
         Assert.Contains("Choose another match", detailsHtml);
         Assert.Contains("not stored in your note", detailsHtml);
         Assert.Contains("markdown-edit-link", detailsHtml);
@@ -144,6 +150,42 @@ public sealed class FrontendTests
     }
 
     [Fact]
+    public async Task Home_search_renders_the_status_library_for_instant_title_and_note_filtering()
+    {
+        using var app = new TestApp();
+        app.WriteGame("Dark Souls III", "---\ntype: game\nstatus: active\n---\n## Notes\nReturn to Firelink Shrine.");
+        app.WriteGame("Lantern", "---\ntype: game\nstatus: active\n---\n## Notes\nExplore the dark catacombs.");
+        app.WriteGame("Celeste", "---\ntype: game\nstatus: active\n---\n## Notes\nClimb the mountain.");
+        app.WriteGame("Dark Completed", "---\ntype: game\nstatus: completed\n---\n## Notes");
+
+        var homeHtml = await app.Client.GetStringAsync("/?status=active&search=dark");
+
+        Assert.Contains("2 results", homeHtml);
+        Assert.Contains("data-search-text=", homeHtml);
+        Assert.Contains("<h3>Dark Souls III</h3>", homeHtml);
+        Assert.Contains("<h3>Lantern</h3>", homeHtml);
+        Assert.Contains("<h3>Celeste</h3>", homeHtml);
+        Assert.DoesNotContain("<h3>Dark Completed</h3>", homeHtml);
+
+        var titleMatchCard = Regex.Match(
+            homeHtml,
+            "<article(?=[^>]*data-game-id=\"Dark Souls III\")[^>]*>");
+        var noteMatchCard = Regex.Match(
+            homeHtml,
+            "<article(?=[^>]*data-game-id=\"Lantern\")[^>]*>");
+        var nonMatchCard = Regex.Match(
+            homeHtml,
+            "<article(?=[^>]*data-game-id=\"Celeste\")[^>]*>");
+
+        Assert.True(titleMatchCard.Success);
+        Assert.True(noteMatchCard.Success);
+        Assert.True(nonMatchCard.Success);
+        Assert.DoesNotContain(" hidden", titleMatchCard.Value);
+        Assert.DoesNotContain(" hidden", noteMatchCard.Value);
+        Assert.Contains(" hidden", nonMatchCard.Value);
+    }
+
+    [Fact]
     public async Task Details_inline_controls_update_and_clear_frontmatter_without_changing_notes()
     {
         using var app = new TestApp();
@@ -151,8 +193,8 @@ public sealed class FrontendTests
         app.WriteGame("Inline Game", $"---\ntype: game\nstatus: active\nrating: 6\n---\n{markdown}");
 
         var detailsHtml = await app.Client.GetStringAsync("/Games/Details/Inline%20Game");
-        Assert.Equal(2, Regex.Matches(detailsHtml, "aria-label=\"Change status for Inline Game\"").Count);
-        Assert.Equal(2, Regex.Matches(detailsHtml, "aria-label=\"Change rating for Inline Game\"").Count);
+        Assert.Single(Regex.Matches(detailsHtml, "aria-label=\"Change status for Inline Game\""));
+        Assert.Single(Regex.Matches(detailsHtml, "aria-label=\"Change rating for Inline Game\""));
 
         var ratingToken = TestHelpers.GetAntiforgeryToken(detailsHtml);
         var ratingResponse = await app.Client.PostAsync(
@@ -191,18 +233,25 @@ public sealed class FrontendTests
     }
 
     [Fact]
-    public async Task Details_styles_only_apply_row_layout_to_direct_frontmatter_rows()
+    public async Task Details_page_prioritizes_tracker_overview_and_notes_before_media()
     {
         using var app = new TestApp();
+        app.WriteGame(
+            "Ordered Game",
+            "---\ntype: game\nstatus: active\nrating: 7\nplatform: PC\n---\n## Notes\nKeep the journal prominent.");
 
-        var detailsCss = await app.Client.GetStringAsync("/css/game-details.css");
-        var libraryCss = await app.Client.GetStringAsync("/css/game-library.css");
-        var darkThemeCss = await app.Client.GetStringAsync("/css/theme-dark.css");
+        var detailsHtml = await app.Client.GetStringAsync("/Games/Details/Ordered%20Game");
+        var trackerIndex = detailsHtml.IndexOf("class=\"game-details-strip\"", StringComparison.Ordinal);
+        var overviewIndex = detailsHtml.IndexOf("class=\"game-description-card\"", StringComparison.Ordinal);
+        var notesIndex = detailsHtml.IndexOf("class=\"note-card\"", StringComparison.Ordinal);
+        var mediaIndex = detailsHtml.IndexOf("class=\"game-media-collection\"", StringComparison.Ordinal);
 
-        Assert.Contains(".metadata-card dl > div", detailsCss);
-        Assert.DoesNotContain(".metadata-card dl div {", detailsCss);
-        Assert.Contains(".metadata-card dl > div", darkThemeCss);
-        Assert.DoesNotContain(".metadata-card dl div {", darkThemeCss);
-        Assert.Contains(".inline-metadata-control:has(> .dropdown-menu.show)", libraryCss);
+        Assert.True(trackerIndex >= 0);
+        Assert.True(trackerIndex < overviewIndex);
+        Assert.True(overviewIndex < notesIndex);
+        Assert.True(notesIndex < mediaIndex);
+        Assert.Contains("Game details", detailsHtml);
+        Assert.Contains("platform", detailsHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Frontmatter", detailsHtml);
     }
 }

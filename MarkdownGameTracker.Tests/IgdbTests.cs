@@ -93,10 +93,12 @@ public sealed class IgdbTests
         Assert.Equal(
             "https://images.igdb.com/igdb/image/upload/t_1080p/artwork-remastered.jpg",
             selectedResult.HeroUrl);
+        Assert.Equal(2, selectedResult.Artworks.Count);
         Assert.Equal(2, selectedResult.Screenshots.Count);
-        Assert.NotNull(selectedResult.Video);
-        Assert.Equal("Gameplay Preview", selectedResult.Video.Name);
-        Assert.Equal("https://www.youtube-nocookie.com/embed/abcdefghijk", selectedResult.Video.EmbedUrl);
+        Assert.Equal(2, selectedResult.Videos.Count);
+        Assert.Equal("Gameplay Preview", selectedResult.Videos[0].Name);
+        Assert.Equal("https://www.youtube-nocookie.com/embed/abcdefghijk", selectedResult.Videos[0].EmbedUrl);
+        Assert.Equal("Launch Trailer", selectedResult.Videos[1].Name);
         Assert.Equal(originalNote, await File.ReadAllTextAsync(app.GamePath("Metadata Game")));
 
         var missingResponse = await app.Client.GetAsync("/api/games/Missing/igdb-description");
@@ -157,10 +159,12 @@ public sealed class IgdbTests
         Assert.Equal(
             "https://images.igdb.com/igdb/image/upload/t_1080p/art202.jpg",
             description.HeroUrl);
-        Assert.Equal(2, description.Screenshots.Count);
-        Assert.NotNull(description.Video);
-        Assert.Equal("Gameplay Preview", description.Video.Name);
-        Assert.Equal("https://www.youtube-nocookie.com/embed/abcdefghijk", description.Video.EmbedUrl);
+        Assert.Equal(2, description.Artworks.Count);
+        Assert.Equal(7, description.Screenshots.Count);
+        Assert.Equal(2, description.Videos.Count);
+        Assert.Equal("Gameplay Preview", description.Videos[0].Name);
+        Assert.Equal("https://www.youtube-nocookie.com/embed/abcdefghijk", description.Videos[0].EmbedUrl);
+        Assert.Equal("Launch Trailer", description.Videos[1].Name);
         Assert.Equal(
             "https://images.igdb.com/igdb/image/upload/t_cover_small_2x/cover202.jpg",
             matches.Matches[1].CoverUrl);

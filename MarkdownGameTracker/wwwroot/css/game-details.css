@@ -3,13 +3,7 @@
   align-items: center;
 }
 
-.note-meta {
-  margin: 1.4rem 0 0.8rem;
-  justify-content: flex-start;
-}
-
-.file-hint,
-.updated-time {
+.file-hint {
   margin-bottom: 0;
   color: var(--ink-soft);
   font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
@@ -68,6 +62,7 @@
 
 .game-identity {
   min-width: 0;
+  max-width: 100%;
   display: flex;
   align-items: flex-end;
   gap: clamp(1rem, 2.5vw, 1.5rem);
@@ -75,6 +70,7 @@
 
 .game-hero-title {
   min-width: 0;
+  flex: 1;
   padding-bottom: 0.3rem;
 }
 
@@ -84,12 +80,14 @@
   color: #fff;
   font-size: clamp(2rem, 4.4vw, 4rem);
   line-height: 0.98;
+  overflow-wrap: anywhere;
   text-wrap: balance;
   text-shadow: 0 3px 22px rgba(0, 0, 0, 0.62);
 }
 
 .game-hero-title .file-hint {
   color: rgba(255, 255, 255, 0.82);
+  overflow-wrap: anywhere;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
 }
 
@@ -106,6 +104,7 @@
 .game-cover-image {
   width: clamp(105px, 16vw, 175px);
   max-height: 260px;
+  flex: 0 0 auto;
   display: block;
   object-fit: cover;
   border: 3px solid rgba(255, 255, 255, 0.86);
@@ -131,6 +130,95 @@
   background: rgba(255, 255, 255, 0.58);
 }
 
+.game-details-strip {
+  margin-bottom: 1.15rem;
+  padding: clamp(1rem, 2.5vw, 1.35rem);
+  display: grid;
+  grid-template-columns: minmax(150px, 190px) minmax(0, 1fr);
+  align-items: center;
+  gap: 1rem 1.4rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: 0 7px 22px rgba(69, 116, 158, 0.07);
+}
+
+.game-details-heading .eyebrow {
+  margin-bottom: 0.3rem;
+}
+
+.game-details-heading h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.game-details-list {
+  min-width: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  gap: 0.75rem;
+}
+
+.game-detail-item {
+  min-width: 0;
+  padding-left: 0.9rem;
+  border-left: 1px solid var(--border);
+}
+
+.game-detail-item dt {
+  margin-bottom: 0.35rem;
+  color: var(--ink-soft);
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.game-detail-item dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.82rem;
+}
+
+.game-detail-updated dd {
+  color: var(--ink-soft);
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.72rem;
+}
+
+.game-media-collection {
+  margin-top: 1.15rem;
+  overflow: hidden;
+  border: 1px solid rgba(82, 141, 192, 0.28);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: 0 7px 22px rgba(69, 116, 158, 0.07);
+}
+
+.game-media-collection-heading {
+  padding: 1rem 1.2rem;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  background: var(--blue-100);
+}
+
+.game-media-collection-heading .eyebrow {
+  margin-bottom: 0.25rem;
+}
+
+.game-media-collection-heading h2 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.game-media-collection-heading > span {
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+}
+
 .game-screenshot-section {
   padding: 1.2rem;
   border-top: 1px solid var(--border);
@@ -153,24 +241,40 @@
   font-size: 1.1rem;
 }
 
-.game-screenshot-heading > span {
-  color: var(--ink-soft);
+.game-media-view-all {
+  padding: 0;
+  color: #266fae;
+  border: 0;
+  background: transparent;
   font-size: 0.75rem;
+  font-weight: 750;
+}
+
+.game-media-view-all:hover,
+.game-media-view-all:focus-visible {
+  color: #174f81;
+  text-decoration: underline;
 }
 
 .game-screenshot-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding-bottom: 0.35rem;
+  display: flex;
   gap: 0.65rem;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: inline mandatory;
+  scrollbar-color: var(--blue-400) transparent;
 }
 
 .game-screenshot-link {
   position: relative;
+  flex: 0 0 clamp(230px, 28vw, 340px);
   aspect-ratio: 16 / 9;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--blue-100);
+  scroll-snap-align: start;
 }
 
 .game-screenshot-link::after {
@@ -328,9 +432,23 @@
   font-size: 0.75rem;
 }
 
+.game-video-carousel {
+  padding-bottom: 0.35rem;
+  display: flex;
+  gap: 0.85rem;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: inline mandatory;
+  scrollbar-color: var(--blue-400) transparent;
+}
+
+.game-video-item {
+  flex: 0 0 clamp(320px, 65vw, 720px);
+  min-width: 0;
+  scroll-snap-align: start;
+}
+
 .game-video-frame {
-  max-width: 1100px;
-  margin: 0 auto;
   aspect-ratio: 16 / 9;
   overflow: hidden;
   border: 1px solid var(--border);
@@ -343,6 +461,16 @@
   height: 100%;
   display: block;
   border: 0;
+}
+
+.game-video-item-title {
+  margin: 0.55rem 0 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .game-description-card {
@@ -547,15 +675,7 @@
   font-size: 0.82rem;
 }
 
-.note-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 290px;
-  align-items: start;
-  gap: 1.15rem;
-}
-
-.note-card,
-.metadata-card {
+.note-card {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface);
@@ -741,41 +861,6 @@
   display: grid;
   place-content: center;
   text-align: center;
-}
-
-.metadata-card {
-  padding: 1.35rem;
-}
-
-.metadata-card h2 {
-  margin-bottom: 1.2rem;
-  font-size: 1.35rem;
-}
-
-.metadata-card dl {
-  margin-bottom: 1.2rem;
-}
-
-.metadata-card dl > div {
-  padding: 0.7rem 0;
-  display: grid;
-  grid-template-columns: minmax(70px, 0.8fr) 1.2fr;
-  gap: 0.5rem;
-  border-bottom: 1px solid #e8f0f6;
-}
-
-.metadata-card dt {
-  color: var(--ink-soft);
-  font-size: 0.78rem;
-  font-weight: 650;
-  text-transform: capitalize;
-}
-
-.metadata-card dd {
-  margin: 0;
-  overflow-wrap: anywhere;
-  font-size: 0.82rem;
-  text-align: right;
 }
 
 .success-alert {

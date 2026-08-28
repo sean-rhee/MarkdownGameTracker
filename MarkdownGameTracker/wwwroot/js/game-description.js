@@ -16,11 +16,14 @@
   const heroImage = mediaPanel.querySelector("[data-game-hero]");
   const coverImage = mediaPanel.querySelector("[data-game-cover]");
   const artworkCredit = mediaPanel.querySelector("[data-artwork-credit]");
-  const screenshotSection = mediaPanel.querySelector("[data-game-screenshots]");
-  const screenshotGrid = mediaPanel.querySelector("[data-game-screenshot-grid]");
-  const videoSection = mediaPanel.querySelector("[data-game-video]");
-  const videoTitle = mediaPanel.querySelector("[data-game-video-title]");
-  const videoFrame = mediaPanel.querySelector("[data-game-video-frame]");
+  const mediaCollection = document.querySelector("[data-game-media-collection]");
+  const screenshotSection = mediaCollection.querySelector("[data-game-screenshots]");
+  const screenshotGrid = mediaCollection.querySelector("[data-game-screenshot-grid]");
+  const viewAllScreenshots = mediaCollection.querySelector("[data-view-all-screenshots]");
+  const screenshotCount = mediaCollection.querySelector("[data-screenshot-count]");
+  const videoSection = mediaCollection.querySelector("[data-game-video]");
+  const videoCarousel = mediaCollection.querySelector("[data-game-video-carousel]");
+  const videoCount = mediaCollection.querySelector("[data-video-count]");
   const screenshotViewer = document.querySelector("[data-game-screenshot-viewer]");
   const screenshotViewerImage = screenshotViewer?.querySelector("[data-screenshot-viewer-image]");
   const screenshotCounter = screenshotViewer?.querySelector("[data-screenshot-counter]");
@@ -118,20 +121,34 @@
     coverImage.hidden = true;
     coverImage.removeAttribute("src");
     artworkCredit.hidden = true;
+    mediaCollection.hidden = true;
     screenshotSection.hidden = true;
     screenshotGrid.replaceChildren();
+    viewAllScreenshots.hidden = true;
+    screenshotCount.textContent = "";
     videoSection.hidden = true;
-    videoTitle.textContent = "Game video";
-    videoFrame.title = "";
-    videoFrame.removeAttribute("src");
+    videoCarousel.replaceChildren();
+    videoCount.textContent = "";
     viewerScreenshots = [];
   };
 
   const renderMedia = (result) => {
     clearMedia();
+    const artworks = Array.isArray(result.artworks) ? result.artworks : [];
     const screenshots = Array.isArray(result.screenshots) ? result.screenshots : [];
-    const videoEmbedUrl = getSafeVideoEmbedUrl(result.video?.embedUrl);
-    if (!result.heroUrl && !result.coverUrl && screenshots.length === 0 && !videoEmbedUrl) {
+    const images = [
+      ...artworks.map((image, index) => ({ ...image, kind: "Artwork", kindIndex: index + 1 })),
+      ...screenshots.map((image, index) => ({ ...image, kind: "Screenshot", kindIndex: index + 1 }))
+    ].filter((image, index, collection) =>
+      image.fullSizeUrl
+      && collection.findIndex(candidate => candidate.fullSizeUrl === image.fullSizeUrl) === index);
+    const videos = (Array.isArray(result.videos) ? result.videos : [])
+      .map(video => ({
+        name: video.name?.trim() || "Game video",
+        embedUrl: getSafeVideoEmbedUrl(video.embedUrl)
+      }))
+      .filter(video => video.embedUrl);
+    if (!result.heroUrl && !result.coverUrl && images.length === 0 && videos.length === 0) {
       return;
     }
 
@@ -149,19 +166,50 @@
 
     artworkCredit.hidden = false;
 
-    if (screenshots.length > 0) {
-      viewerScreenshots = screenshots.map((screenshot, index) => ({
-        fullSizeUrl: screenshot.fullSizeUrl,
-        alt: `Screenshot ${index + 1} from ${result.matchedTitle ?? gameTitle}`
+    if (videos.length > 0) {
+      for (const [index, video] of videos.entries()) {
+        const item = document.createElement("article");
+        item.className = "game-video-item";
+
+        const frame = document.createElement("div");
+        frame.className = "game-video-frame";
+
+        const iframe = document.createElement("iframe");
+        iframe.src = video.embedUrl;
+        iframe.title = `${video.name} for ${result.matchedTitle ?? gameTitle}`;
+        iframe.loading = index === 0 ? "eager" : "lazy";
+        iframe.referrerPolicy = "strict-origin-when-cross-origin";
+        iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+        iframe.allowFullscreen = true;
+
+        const title = document.createElement("h4");
+        title.className = "game-video-item-title";
+        title.textContent = video.name;
+
+        frame.append(iframe);
+        item.append(frame, title);
+        videoCarousel.append(item);
+      }
+
+      videoCount.textContent = String(videos.length);
+      videoSection.hidden = false;
+    }
+
+    if (images.length > 0) {
+      viewerScreenshots = images.map(image => ({
+        fullSizeUrl: image.fullSizeUrl,
+        alt: `${image.kind} ${image.kindIndex} from ${result.matchedTitle ?? gameTitle}`
       }));
 
-      for (const [index, screenshot] of screenshots.entries()) {
+      for (const [index, imageItem] of images.entries()) {
         const link = document.createElement("a");
         link.className = "game-screenshot-link";
-        link.href = screenshot.fullSizeUrl;
+        link.href = imageItem.fullSizeUrl;
         link.target = "_blank";
         link.rel = "noopener noreferrer";
-        link.setAttribute("aria-label", `View screenshot ${index + 1} from ${result.matchedTitle ?? gameTitle}`);
+        link.setAttribute(
+          "aria-label",
+          `View ${imageItem.kind.toLowerCase()} ${imageItem.kindIndex} from ${result.matchedTitle ?? gameTitle}`);
         link.addEventListener("click", (event) => {
           if (openScreenshotViewer(index)) {
             event.preventDefault();
@@ -169,8 +217,8 @@
         });
 
         const image = document.createElement("img");
-        image.src = screenshot.thumbnailUrl;
-        image.alt = `Screenshot ${index + 1} from ${result.matchedTitle ?? gameTitle}`;
+        image.src = imageItem.thumbnailUrl;
+        image.alt = `${imageItem.kind} ${imageItem.kindIndex} from ${result.matchedTitle ?? gameTitle}`;
         image.loading = "lazy";
         image.referrerPolicy = "no-referrer";
         link.append(image);
@@ -178,17 +226,14 @@
       }
 
       screenshotSection.hidden = false;
+      screenshotCount.textContent = `(${images.length})`;
+      viewAllScreenshots.hidden = false;
     }
 
-    if (videoEmbedUrl) {
-      const name = result.video.name?.trim() || "Game video";
-      videoTitle.textContent = name;
-      videoFrame.title = `${name} for ${result.matchedTitle ?? gameTitle}`;
-      videoFrame.src = videoEmbedUrl;
-      videoSection.hidden = false;
-    }
+    mediaCollection.hidden = images.length === 0 && videos.length === 0;
   };
 
+  viewAllScreenshots.addEventListener("click", () => openScreenshotViewer(0));
   previousScreenshot?.addEventListener("click", () => moveScreenshot(-1));
   nextScreenshot?.addEventListener("click", () => moveScreenshot(1));
   screenshotViewer?.addEventListener("keydown", (event) => {

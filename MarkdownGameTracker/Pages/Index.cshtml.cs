@@ -20,6 +20,8 @@ public sealed class IndexModel(
 
     public IReadOnlyList<GameNote> Games { get; private set; } = [];
 
+    public int VisibleGameCount { get; private set; }
+
     public IReadOnlyList<string> SearchSuggestions { get; private set; } = [];
 
     public IReadOnlyList<StatusTab> StatusTabs { get; private set; } = [];
@@ -35,12 +37,14 @@ public sealed class IndexModel(
         Status = SelectedStatus;
 
         var allGames = await repository.ListAsync(null, null, cancellationToken);
-        Games = await repository.ListAsync(SelectedStatus, Search, cancellationToken);
-        SearchSuggestions = allGames
+        Games = allGames
             .Where(game => string.Equals(
                 game.Status,
                 SelectedStatus,
                 StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        VisibleGameCount = Games.Count(IsSearchMatch);
+        SearchSuggestions = Games
             .Select(game => game.Title)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(title => title, StringComparer.OrdinalIgnoreCase)
@@ -54,6 +58,22 @@ public sealed class IndexModel(
                     status,
                     StringComparison.OrdinalIgnoreCase))))
             .ToArray();
+    }
+
+    public bool IsSearchMatch(GameNote game) => MatchesSearch(game, Search);
+
+    public static string GetSearchText(GameNote game) => $"{game.Title}\n{game.Markdown}";
+
+    private static bool MatchesSearch(GameNote game, string? search)
+    {
+        if (string.IsNullOrWhiteSpace(search))
+        {
+            return true;
+        }
+
+        var term = search.Trim();
+        return game.Title.Contains(term, StringComparison.OrdinalIgnoreCase)
+               || game.Markdown.Contains(term, StringComparison.OrdinalIgnoreCase);
     }
 
     public async Task<IActionResult> OnPostChangeStatusAsync(

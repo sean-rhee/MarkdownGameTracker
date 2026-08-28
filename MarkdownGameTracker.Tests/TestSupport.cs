@@ -87,10 +87,17 @@ internal sealed class FakeIgdbDescriptionService : IIgdbDescriptionService
                 "https://images.igdb.com/igdb/image/upload/t_cover_big_2x/cover-remastered.jpg",
                 "https://images.igdb.com/igdb/image/upload/t_1080p/artwork-remastered.jpg",
                 [
+                    new IgdbScreenshot("https://images.igdb.com/art-thumb-1.jpg", "https://images.igdb.com/art-full-1.jpg"),
+                    new IgdbScreenshot("https://images.igdb.com/art-thumb-2.jpg", "https://images.igdb.com/art-full-2.jpg")
+                ],
+                [
                     new IgdbScreenshot("https://images.igdb.com/thumb-1.jpg", "https://images.igdb.com/full-1.jpg"),
                     new IgdbScreenshot("https://images.igdb.com/thumb-2.jpg", "https://images.igdb.com/full-2.jpg")
                 ],
-                new IgdbVideo("Gameplay Preview", "https://www.youtube-nocookie.com/embed/abcdefghijk"))
+                [
+                    new IgdbVideo("Gameplay Preview", "https://www.youtube-nocookie.com/embed/abcdefghijk"),
+                    new IgdbVideo("Launch Trailer", "https://www.youtube-nocookie.com/embed/lmnopqrstuv")
+                ])
             : IgdbDescriptionResult.Available(
                 101,
                 $"{title} is a fetched description.",
@@ -190,10 +197,18 @@ internal sealed class FakeIgdbHttpHandler : HttpMessageHandler
                   "summary":"The exact selected description.",
                   "slug":"metadata-game-remastered",
                   "cover":{"image_id":"cover202"},
-                  "artworks":[{"image_id":"art202","width":1920,"height":1080}],
+                  "artworks":[
+                    {"image_id":"art202","width":1920,"height":1080},
+                    {"image_id":"art202b","width":1280,"height":720}
+                  ],
                   "screenshots":[
                     {"image_id":"shot202a","width":1920,"height":1080},
-                    {"image_id":"shot202b","width":1920,"height":1080}
+                    {"image_id":"shot202b","width":1920,"height":1080},
+                    {"image_id":"shot202c","width":1920,"height":1080},
+                    {"image_id":"shot202d","width":1920,"height":1080},
+                    {"image_id":"shot202e","width":1920,"height":1080},
+                    {"image_id":"shot202f","width":1920,"height":1080},
+                    {"image_id":"shot202g","width":1920,"height":1080}
                   ],
                   "videos":[
                     {"name":"Gameplay Preview","video_id":"abcdefghijk"},

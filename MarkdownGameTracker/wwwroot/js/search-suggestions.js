@@ -7,11 +7,24 @@
   const input = combobox.querySelector("input[role='combobox']");
   const list = combobox.querySelector("[role='listbox']");
   const form = combobox.closest("form");
-  if (!input || !list || !form) {
+  const results = document.querySelector("[data-search-results]");
+  const resultCount = document.querySelector("[data-search-result-count]");
+  const emptyState = document.querySelector("[data-search-empty-state]");
+  const clearLink = form?.querySelector("[data-search-clear]");
+  if (!input || !list || !form || !results || !resultCount || !emptyState || !clearLink) {
     return;
   }
 
   const maximumVisibleSuggestions = 7;
+  const cards = Array.from(results.querySelectorAll("[data-game-card]"))
+    .map((element) => ({
+      element,
+      normalizedSearchText: (element.dataset.searchText ?? "").toLocaleLowerCase()
+    }));
+  const statusLinks = Array.from(document.querySelectorAll(".status-tab"));
+  const dependentSearchInputs = Array.from(
+    document.querySelectorAll("input[type='hidden'][name='search']")
+  );
   const suggestions = Array.from(list.querySelectorAll("[data-search-suggestion]"))
     .map((element, index) => ({
       element,
@@ -88,13 +101,64 @@
     input.setAttribute("aria-expanded", "true");
   };
 
-  const chooseSuggestion = (suggestion) => {
-    input.value = suggestion.value;
-    closeSuggestions();
-    form.requestSubmit();
+  const setSearchParameter = (url, query) => {
+    url.searchParams.delete("Search");
+    if (query) {
+      url.searchParams.set("search", query);
+    } else {
+      url.searchParams.delete("search");
+    }
   };
 
-  input.addEventListener("input", updateSuggestions);
+  const updateResults = (syncBrowserUrl = true) => {
+    const query = input.value.trim();
+    const normalizedQuery = query.toLocaleLowerCase();
+    let visibleCount = 0;
+
+    cards.forEach(({ element, normalizedSearchText }) => {
+      const isVisible = !normalizedQuery || normalizedSearchText.includes(normalizedQuery);
+      element.hidden = !isVisible;
+      if (isVisible) {
+        visibleCount += 1;
+      }
+    });
+
+    resultCount.textContent = `${visibleCount} ${visibleCount === 1 ? "result" : "results"}`;
+    results.hidden = visibleCount === 0;
+    emptyState.hidden = visibleCount !== 0;
+    clearLink.hidden = !query;
+
+    dependentSearchInputs.forEach((searchInput) => {
+      searchInput.value = query;
+    });
+
+    statusLinks.forEach((link) => {
+      const url = new URL(link.href, window.location.href);
+      setSearchParameter(url, query);
+      link.href = `${url.pathname}${url.search}${url.hash}`;
+    });
+
+    if (syncBrowserUrl) {
+      const url = new URL(window.location.href);
+      setSearchParameter(url, query);
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${url.pathname}${url.search}${url.hash}`
+      );
+    }
+  };
+
+  const chooseSuggestion = (suggestion) => {
+    input.value = suggestion.value;
+    updateResults();
+    closeSuggestions();
+  };
+
+  input.addEventListener("input", () => {
+    updateSuggestions();
+    updateResults();
+  });
   input.addEventListener("focus", updateSuggestions);
   input.addEventListener("keydown", (event) => {
     if (list.hidden || visibleSuggestions.length === 0) {
@@ -133,6 +197,15 @@
     }
   });
 
+  clearLink.addEventListener("click", (event) => {
+    event.preventDefault();
+    input.value = "";
+    updateSuggestions();
+    updateResults();
+    input.focus();
+  });
+
   form.addEventListener("submit", closeSuggestions);
   closeSuggestions();
+  updateResults(false);
 })();

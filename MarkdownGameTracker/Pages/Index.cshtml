@@ -24,7 +24,9 @@
             <span class="eyebrow">The library</span>
             <h2>Game notes</h2>
         </div>
-        <span class="result-count">@Model.Games.Count @(Model.Games.Count == 1 ? "result" : "results")</span>
+        <span class="result-count" data-search-result-count aria-live="polite">
+            @Model.VisibleGameCount @(Model.VisibleGameCount == 1 ? "result" : "results")
+        </span>
     </div>
 
     <nav class="status-tabs" aria-label="Game status">
@@ -66,48 +68,52 @@
             </div>
         </div>
         <button class="btn btn-secondary" type="submit">Search</button>
-        @if (!string.IsNullOrWhiteSpace(Model.Search))
-        {
-            <a class="btn btn-link" asp-page="/Index" asp-route-status="@Model.SelectedStatus">Clear</a>
-        }
+        <a class="btn btn-link"
+           asp-page="/Index"
+           asp-route-status="@Model.SelectedStatus"
+           data-search-clear
+           hidden="@string.IsNullOrWhiteSpace(Model.Search)">Clear</a>
     </form>
 
-    @if (Model.Games.Count == 0)
-    {
-        <div class="empty-state">
-            <div class="empty-icon" aria-hidden="true">✦</div>
-            <h3>No @GameStatuses.GetLabel(Model.SelectedStatus).ToLowerInvariant() games found</h3>
-            <p>Try clearing the search or add a game to this list.</p>
-            <a class="btn btn-primary" asp-page="/Games/Create">Add a game</a>
-        </div>
-    }
-    else
-    {
-        <div class="game-grid" data-game-artwork-grid data-artwork-url="/api/games/igdb-card-artwork">
-            @foreach (var game in Model.Games)
-            {
-                <article class="game-card" data-game-card data-game-id="@game.Id">
-                    <div class="game-card-artwork" data-game-card-artwork hidden>
-                        <img data-game-card-image loading="lazy" decoding="async" alt="" />
+    <div class="empty-state" data-search-empty-state hidden="@(Model.VisibleGameCount != 0)">
+        <div class="empty-icon" aria-hidden="true">✦</div>
+        <h3>No @GameStatuses.GetLabel(Model.SelectedStatus).ToLowerInvariant() games found</h3>
+        <p>Try clearing the search or add a game to this list.</p>
+        <a class="btn btn-primary" asp-page="/Games/Create">Add a game</a>
+    </div>
+
+    <div class="game-grid"
+         data-game-artwork-grid
+         data-search-results
+         data-artwork-url="/api/games/igdb-card-artwork"
+         hidden="@(Model.VisibleGameCount == 0)">
+        @foreach (var game in Model.Games)
+        {
+            <article class="game-card"
+                     data-game-card
+                     data-game-id="@game.Id"
+                     data-search-text="@IndexModel.GetSearchText(game)"
+                     hidden="@(!Model.IsSearchMatch(game))">
+                <div class="game-card-artwork" data-game-card-artwork hidden>
+                    <img data-game-card-image loading="lazy" decoding="async" alt="" />
+                </div>
+                <div class="game-card-content">
+                    <div class="game-card-top">
+                        <partial name="_InlineStatusControl"
+                                 model="@(new InlineStatusControlModel(game.Id, game.Status, "/Index", Model.SelectedStatus, Model.Search))" />
+                        <partial name="_InlineRatingControl"
+                                 model="@(new InlineRatingControlModel(game.Id, game.Rating, "/Index", Model.SelectedStatus, Model.Search))" />
                     </div>
-                    <div class="game-card-content">
-                        <div class="game-card-top">
-                            <partial name="_InlineStatusControl"
-                                     model="@(new InlineStatusControlModel(game.Id, game.Status, "/Index", Model.SelectedStatus, Model.Search))" />
-                            <partial name="_InlineRatingControl"
-                                     model="@(new InlineRatingControlModel(game.Id, game.Rating, "/Index", Model.SelectedStatus, Model.Search))" />
-                        </div>
-                        <h3>@game.Title</h3>
-                        <p>@IndexModel.GetExcerpt(game.Markdown)</p>
-                        <div class="game-card-actions">
-                            <a class="stretched-link" asp-page="/Games/Details" asp-route-id="@game.Id">Open note</a>
-                            <span aria-hidden="true">→</span>
-                        </div>
+                    <h3>@game.Title</h3>
+                    <p>@IndexModel.GetExcerpt(game.Markdown)</p>
+                    <div class="game-card-actions">
+                        <a class="stretched-link" asp-page="/Games/Details" asp-route-id="@game.Id">Open note</a>
+                        <span aria-hidden="true">→</span>
                     </div>
-                </article>
-            }
-        </div>
-    }
+                </div>
+            </article>
+        }
+    </div>
 </section>
 
 @section Scripts {

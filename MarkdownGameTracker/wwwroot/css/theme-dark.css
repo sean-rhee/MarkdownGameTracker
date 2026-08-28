@@ -244,10 +244,6 @@ html[data-theme="dark"] .game-hero-frame[data-has-hero="false"] .game-artwork-cr
   background: rgba(15, 30, 45, 0.56);
 }
 
-html[data-theme="dark"] .metadata-card dl > div {
-  border-bottom-color: #29465d;
-}
-
 html[data-theme="dark"] .success-alert {
   color: #a9dfcf;
   border-color: #356657;

@@ -10,15 +10,7 @@
 }
 
 <div class="note-header">
-    <div>
-        <a class="back-link" asp-page="/Index">← Back to games</a>
-        <div class="note-meta">
-            <partial name="_InlineStatusControl"
-                     model="@(new InlineStatusControlModel(Model.Game.Id, Model.Game.Status, "/Games/Details"))" />
-            <partial name="_InlineRatingControl"
-                     model="@(new InlineRatingControlModel(Model.Game.Id, Model.Game.Rating, "/Games/Details"))" />
-        </div>
-    </div>
+    <a class="back-link" asp-page="/Index">← Back to games</a>
     <div class="note-actions">
         <a class="btn btn-primary" asp-page="/Games/Edit" asp-route-id="@Model.Game.Id">Edit note</a>
         <button class="btn btn-danger-soft" type="button" data-bs-toggle="modal" data-bs-target="#deleteModal">Delete</button>
@@ -47,33 +39,44 @@
             <span class="game-artwork-credit" data-artwork-credit hidden>Artwork from IGDB</span>
         </div>
     </div>
-    <div class="game-screenshot-section" data-game-screenshots hidden>
-        <div class="game-screenshot-heading">
-            <div>
-                <span class="eyebrow">Gallery</span>
-                <h3>Screenshots</h3>
-            </div>
-            <span>Open any image at full size</span>
-        </div>
-        <div class="game-screenshot-grid" data-game-screenshot-grid></div>
+</section>
+
+<section class="game-details-strip" aria-labelledby="gameDetailsHeading">
+    <div class="game-details-heading">
+        <span class="eyebrow">Tracker</span>
+        <h2 id="gameDetailsHeading">Game details</h2>
     </div>
-    <div class="game-video-section" data-game-video hidden>
-        <div class="game-video-heading">
-            <div>
-                <span class="eyebrow">Video</span>
-                <h3 data-game-video-title>Game video</h3>
+    <dl class="game-details-list">
+        <div class="game-detail-item">
+            <dt>Status</dt>
+            <dd>
+                <partial name="_InlineStatusControl"
+                         model="@(new InlineStatusControlModel(Model.Game.Id, Model.Game.Status, "/Games/Details"))" />
+            </dd>
+        </div>
+        <div class="game-detail-item">
+            <dt>Rating</dt>
+            <dd>
+                <partial name="_InlineRatingControl"
+                         model="@(new InlineRatingControlModel(Model.Game.Id, Model.Game.Rating, "/Games/Details"))" />
+            </dd>
+        </div>
+        @foreach (var item in Model.ExtraFrontmatter)
+        {
+            <div class="game-detail-item">
+                <dt>@item.Key</dt>
+                <dd>@DetailsModel.FormatFrontmatterValue(item.Value)</dd>
             </div>
-            <span>Video listed by IGDB</span>
+        }
+        <div class="game-detail-item game-detail-updated">
+            <dt>Updated</dt>
+            <dd>
+                <time datetime="@Model.Game.LastModifiedUtc.ToString("O")">
+                    @Model.Game.LastModifiedUtc.ToLocalTime().ToString("MMM d, yyyy · h:mm tt")
+                </time>
+            </dd>
         </div>
-        <div class="game-video-frame">
-            <iframe data-game-video-frame
-                    title=""
-                    loading="lazy"
-                    referrerpolicy="strict-origin-when-cross-origin"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    allowfullscreen></iframe>
-        </div>
-    </div>
+    </dl>
 </section>
 
 <div class="modal fade game-screenshot-viewer"
@@ -85,7 +88,7 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="modal-title fs-5" id="gameScreenshotViewerLabel">Screenshots</h2>
+                <h2 class="modal-title fs-5" id="gameScreenshotViewerLabel">Artwork &amp; screenshots</h2>
                 <span class="game-screenshot-counter" data-screenshot-counter aria-live="polite"></span>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close image viewer"></button>
             </div>
@@ -154,63 +157,63 @@
     </div>
 </section>
 
-<div class="note-layout">
-    <article class="note-card">
-        <div class="note-card-heading">
-            <span class="eyebrow">Markdown</span>
-            <div class="note-card-heading-actions">
-                <span class="note-storage-label">Stored in Obsidian</span>
-                <a class="btn btn-primary markdown-edit-link"
-                   asp-page="/Games/Edit"
-                   asp-route-id="@Model.Game.Id">Edit note</a>
-            </div>
+<article class="note-card" aria-label="Markdown notes">
+    <div class="note-card-heading">
+        <span class="eyebrow">Markdown notes</span>
+        <div class="note-card-heading-actions">
+            <span class="note-storage-label">Stored in Obsidian</span>
+            <a class="btn btn-primary markdown-edit-link"
+               asp-page="/Games/Edit"
+               asp-route-id="@Model.Game.Id">Edit note</a>
         </div>
-        @if (string.IsNullOrWhiteSpace(Model.Game.Markdown))
-        {
-            <div class="empty-note">
-                <p>This note is empty.</p>
-                <a asp-page="/Games/Edit" asp-route-id="@Model.Game.Id">Add some thoughts →</a>
-            </div>
-        }
-        else
-        {
-            <div class="markdown-body markdown-content">@Html.Raw(Model.RenderedMarkdown)</div>
-        }
-    </article>
+    </div>
+    @if (string.IsNullOrWhiteSpace(Model.Game.Markdown))
+    {
+        <div class="empty-note">
+            <p>This note is empty.</p>
+            <a asp-page="/Games/Edit" asp-route-id="@Model.Game.Id">Add some thoughts →</a>
+        </div>
+    }
+    else
+    {
+        <div class="markdown-body markdown-content">@Html.Raw(Model.RenderedMarkdown)</div>
+    }
+</article>
 
-    <aside class="metadata-card">
-        <span class="eyebrow">Frontmatter</span>
-        <h2>Note data</h2>
-        <dl>
+<section class="game-media-collection"
+         aria-labelledby="gameMediaHeading"
+         data-game-media-collection
+         hidden>
+    <div class="game-media-collection-heading">
+        <div>
+            <span class="eyebrow">Media</span>
+            <h2 id="gameMediaHeading">Videos &amp; images</h2>
+        </div>
+        <span>Media from IGDB</span>
+    </div>
+    <div class="game-video-section" data-game-video hidden>
+        <div class="game-video-heading">
             <div>
-                <dt>Type</dt>
-                <dd>game</dd>
+                <span class="eyebrow">Watch</span>
+                <h3>Videos</h3>
             </div>
+            <span><span data-video-count></span> listed by IGDB</span>
+        </div>
+        <div class="game-video-carousel" data-game-video-carousel></div>
+    </div>
+    <div class="game-screenshot-section" data-game-screenshots hidden>
+        <div class="game-screenshot-heading">
             <div>
-                <dt>Status</dt>
-                <dd>
-                    <partial name="_InlineStatusControl"
-                             model="@(new InlineStatusControlModel(Model.Game.Id, Model.Game.Status, "/Games/Details"))" />
-                </dd>
+                <span class="eyebrow">Gallery</span>
+                <h3>Artwork &amp; screenshots</h3>
             </div>
-            <div>
-                <dt>Rating</dt>
-                <dd>
-                    <partial name="_InlineRatingControl"
-                             model="@(new InlineRatingControlModel(Model.Game.Id, Model.Game.Rating, "/Games/Details"))" />
-                </dd>
-            </div>
-            @foreach (var item in Model.ExtraFrontmatter)
-            {
-                <div>
-                    <dt>@item.Key</dt>
-                    <dd>@DetailsModel.FormatFrontmatterValue(item.Value)</dd>
-                </div>
-            }
-        </dl>
-        <span class="updated-time">Updated @Model.Game.LastModifiedUtc.ToLocalTime().ToString("MMM d, yyyy · h:mm tt")</span>
-    </aside>
-</div>
+            <button class="game-media-view-all" type="button" data-view-all-screenshots hidden>
+                View all <span data-screenshot-count></span>
+            </button>
+        </div>
+        <div class="game-screenshot-grid" data-game-screenshot-grid></div>
+    </div>
+</section>
 
 <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
