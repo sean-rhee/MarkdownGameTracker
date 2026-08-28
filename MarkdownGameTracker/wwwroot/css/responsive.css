@@ -61,6 +61,15 @@
     grid-template-columns: 1fr;
   }
 
+  .import-preview-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .import-summary {
+    justify-content: flex-start;
+  }
+
   .markdown-toolbar {
     flex-wrap: wrap;
   }

@@ -105,6 +105,10 @@
                                  model="@(new InlineRatingControlModel(game.Id, game.Rating, "/Index", Model.SelectedStatus, Model.Search))" />
                     </div>
                     <h3>@game.Title</h3>
+                    @if (IndexModel.GetPlatform(game) is { } platform)
+                    {
+                        <span class="game-card-platform">@platform</span>
+                    }
                     <p>@IndexModel.GetExcerpt(game.Markdown)</p>
                     <div class="game-card-actions">
                         <a class="stretched-link" asp-page="/Games/Details" asp-route-id="@game.Id">Open note</a>

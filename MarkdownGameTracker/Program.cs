@@ -35,6 +35,7 @@ builder.Services.AddSingleton<IIgdbAccessTokenProvider, IgdbAccessTokenProvider>
 builder.Services.AddHttpClient<IIgdbApiClient, IgdbApiClient>(client =>
     client.Timeout = TimeSpan.FromSeconds(12));
 builder.Services.AddTransient<IIgdbDescriptionService, IgdbDescriptionService>();
+builder.Services.AddTransient<IHltbImportService, HltbImportService>();
 builder.Services.AddSingleton<GameNoteDocumentSerializer>();
 builder.Services.AddSingleton<IGameRepository, MarkdownGameRepository>();
 builder.Services.AddSingleton<IGameMetadataService, GameMetadataService>();

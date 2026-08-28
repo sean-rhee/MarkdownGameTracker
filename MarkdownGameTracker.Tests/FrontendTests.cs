@@ -33,15 +33,18 @@ public sealed class FrontendTests
         var detailsResponse = await app.Client.GetAsync("/Games/Details/Frontend%20Game");
         var editResponse = await app.Client.GetAsync("/Games/Edit/Frontend%20Game");
         var createResponse = await app.Client.GetAsync("/Games/Create");
+        var libraryCssResponse = await app.Client.GetAsync("/css/game-library.css");
         var homeHtml = await homeResponse.Content.ReadAsStringAsync();
         var detailsHtml = await detailsResponse.Content.ReadAsStringAsync();
         var editHtml = await editResponse.Content.ReadAsStringAsync();
         var createHtml = await createResponse.Content.ReadAsStringAsync();
+        var libraryCss = await libraryCssResponse.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, homeResponse.StatusCode);
         Assert.True(detailsResponse.IsSuccessStatusCode, await detailsResponse.Content.ReadAsStringAsync());
         Assert.Equal(HttpStatusCode.OK, editResponse.StatusCode);
         Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, libraryCssResponse.StatusCode);
         Assert.Contains("Game Garden", homeHtml);
         Assert.Contains("Frontend Game", homeHtml);
         Assert.Contains("Endless", homeHtml);
@@ -79,6 +82,8 @@ public sealed class FrontendTests
         Assert.Contains("/api/games/igdb-title-suggestions", createHtml);
         Assert.Contains("game-title-suggestions.js", createHtml);
         Assert.Contains("data-markdown-action=\"bold\"", editHtml);
+        Assert.Contains(".game-card:has(.dropdown-menu.show)", libraryCss);
+        Assert.Contains("z-index: 10", libraryCss);
     }
 
     [Fact]

@@ -16,7 +16,8 @@ public sealed record CreateGameRequest(
     [property: Required] string? Status,
     [property: Range(typeof(decimal), "0", "10")] decimal? Rating,
     string? Markdown,
-    Dictionary<string, object?>? Frontmatter);
+    Dictionary<string, object?>? Frontmatter,
+    string? Id = null);
 
 public sealed record UpdateGameRequest(
     [property: StringLength(200)] string? Title,

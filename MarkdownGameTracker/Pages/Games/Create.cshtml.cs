@@ -31,7 +31,7 @@ public sealed class CreateModel(IGameRepository repository) : PageModel
                     Input.Status,
                     Input.Rating,
                     Input.Markdown,
-                    null),
+                    Input.ToFrontmatter()),
                 cancellationToken);
 
             TempData["SuccessMessage"] = $"Added {game.Title} to your game garden.";

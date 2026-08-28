@@ -1,6 +1,6 @@
 # Markdown Game Tracker
 
-An ASP.NET Core backend that treats the Markdown game notes in an Obsidian vault as its data store. The filename is the game title/ID, YAML frontmatter holds structured fields, and the rest of the file remains ordinary Markdown for notes, thoughts, progress logs, and reviews.
+An ASP.NET Core backend that treats the Markdown game notes in an Obsidian vault as its data store. The filename is a human-readable note ID, YAML frontmatter holds the exact display title and other structured fields, and the rest of the file remains ordinary Markdown for notes, thoughts, progress logs, and reviews. Existing notes without a `title` property continue to use their filename as the display title.
 
 ## Frontend
 
@@ -8,15 +8,16 @@ The root page at [`http://localhost:5297/`](http://localhost:5297/) is a respons
 
 - Five status tabs with counts for Active, Endless, Completed, Inactive, and Plan to play
 - Search scoped to the selected status tab
-- Game cards with status, rating, and note excerpts
+- Game cards with status, rating, platform, and note excerpts
 - Clickable status badges for moving a game between statuses directly from its card
 - A day/night theme toggle that follows the device preference and remembers your choice
 - Game details and frontmatter display
 - An IGDB-powered game description on each details page, with a match picker for similarly named games
-- IGDB cover art, wide artwork, a screenshot gallery, and the first listed video for the selected game match
+- IGDB cover art, wide artwork, all screenshots and artwork, and all listed videos for the selected game match
 - Formatted Markdown viewing with headings, lists, tables, task lists, links, quotes, and code blocks
 - A split Write/Preview editor with formatting controls and keyboard shortcuts
 - Create and edit forms that write through the same Markdown repository as the API
+- A preview-first HowLongToBeat CSV importer that never overwrites existing notes
 - Confirmed deletion of game notes
 - An **API docs** navigation link to Swagger in development
 
@@ -73,7 +74,13 @@ $env:IGDB__ClientId = "your-client-id"
 $env:IGDB__ClientSecret = "your-client-secret"
 ```
 
-Opening a game's details page then loads its IGDB description, cover, wide artwork, up to six screenshots, and first listed YouTube video asynchronously. If the automatic match is wrong, **Choose another match** reveals up to ten likely titles with their release years and cover thumbnails. A manual selection is remembered in that browser's local storage, while results are cached in server memory. Neither the description, media URLs, nor any IGDB identifier is added to the Markdown file. Without credentials, the rest of the details page continues to work and shows a setup message in the description panel.
+Opening a game's details page then loads its IGDB description, cover, wide artwork, complete image gallery, and listed YouTube videos asynchronously. If the automatic match is wrong, **Choose another match** reveals up to ten likely titles with their release years and cover thumbnails. A manual selection is remembered in that browser's local storage, while results are cached in server memory. Neither the description, media URLs, nor any IGDB identifier is added to the Markdown file. Without credentials, the rest of the details page continues to work and shows a setup message in the description panel.
+
+### HowLongToBeat imports
+
+Open **Import HLTB** in the navigation and select a HowLongToBeat CSV export. The preview shows proposed filenames, status mappings, existing-note conflicts, invalid rows, and non-blocking warnings before anything is written.
+
+Playing maps to `active`; Backlog to `planned`; Endless to `endless`; Dropped and Retired to `inactive`; and Completed to `completed`. Duplicate titles use Platform in the filename, with a numeric suffix only when the title and platform are both repeated. Existing notes are skipped, imports are identified by their HLTB Added timestamp, and invalid dates are omitted with a warning.
 
 ## Docker
 
@@ -129,7 +136,8 @@ Create a note:
   "rating": 8.5,
   "markdown": "## Thoughts\nReady for another run.",
   "frontmatter": {
-    "platforms": ["PC", "Steam Deck"]
+    "platform": "PC",
+    "start_date": "2026-08-01"
   }
 }
 ```
@@ -142,6 +150,7 @@ New notes automatically receive the vault's existing defaults:
 type: game
 hobby:
   - "[[Gaming]]"
+title: Hades II
 ```
 
 Writes use a temporary file in the same directory before replacing the destination, reducing the chance of leaving a partially written note. Rewriting a note preserves frontmatter values and Markdown content, but YAML whitespace, quoting, and comments may be normalized.

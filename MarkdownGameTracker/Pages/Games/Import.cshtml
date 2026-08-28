@@ -1,0 +1,143 @@
+@page
+@model MarkdownGameTracker.Pages.Games.ImportModel
+@{
+    ViewData["Title"] = "Import from HowLongToBeat";
+}
+
+<div class="page-heading">
+    <div>
+        <a class="back-link" asp-page="/Index">← Back to games</a>
+        <span class="eyebrow">Bulk import</span>
+        <h1>Import from HowLongToBeat</h1>
+        <p>Preview an HLTB CSV export before creating any Markdown notes.</p>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="alert alert-danger" role="alert">@Model.ErrorMessage</div>
+}
+
+@if (Model.Result is not null)
+{
+    <section class="import-result-card" aria-labelledby="importResultHeading">
+        <span class="eyebrow">Import complete</span>
+        <h2 id="importResultHeading">Created @Model.Result.ImportedCount notes</h2>
+        <p>@Model.Result.SkippedCount existing or invalid rows were skipped.</p>
+        @if (Model.Result.Errors.Count > 0)
+        {
+            <div class="import-errors" role="alert">
+                <strong>@Model.Result.Errors.Count rows could not be imported:</strong>
+                <ul>
+                    @foreach (var error in Model.Result.Errors)
+                    {
+                        <li>@error</li>
+                    }
+                </ul>
+            </div>
+        }
+        <div class="form-actions">
+            <a class="btn btn-primary" asp-page="/Index">View game library</a>
+            <a class="btn btn-link" asp-page="/Games/Import">Import another file</a>
+        </div>
+    </section>
+}
+else
+{
+    <section class="form-card import-upload-card" aria-labelledby="importUploadHeading">
+        <div>
+            <span class="eyebrow">Step 1</span>
+            <h2 id="importUploadHeading">Choose your export</h2>
+            <p class="field-help">Nothing is written to your vault until you approve the preview.</p>
+        </div>
+        <form method="post" enctype="multipart/form-data" asp-page-handler="Preview">
+            <div asp-validation-summary="ModelOnly" class="validation-summary"></div>
+            <div class="form-field">
+                <label asp-for="CsvFile">HowLongToBeat CSV</label>
+                <input asp-for="CsvFile" class="form-control" type="file" accept=".csv,text/csv" />
+                <span asp-validation-for="CsvFile" class="field-validation-error"></span>
+            </div>
+            <button class="btn btn-primary" type="submit">Preview import</button>
+        </form>
+    </section>
+}
+
+@if (Model.Preview is not null && Model.ImportToken is not null)
+{
+    <section class="import-preview" aria-labelledby="importPreviewHeading">
+        <div class="import-preview-heading">
+            <div>
+                <span class="eyebrow">Step 2</span>
+                <h2 id="importPreviewHeading">Review @Model.FileName</h2>
+            </div>
+            <div class="import-summary" aria-label="Import summary">
+                <span><strong>@Model.Preview.ReadyCount</strong> ready</span>
+                <span><strong>@Model.Preview.ConflictCount</strong> existing</span>
+                <span><strong>@Model.Preview.InvalidCount</strong> invalid</span>
+                <span><strong>@Model.Preview.WarningCount</strong> warnings</span>
+            </div>
+        </div>
+
+        <p class="import-preview-note">
+            Duplicate titles use Platform in the filename. Existing notes and invalid rows are always skipped.
+        </p>
+
+        <div class="table-responsive import-preview-table-wrap">
+            <table class="import-preview-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Row</th>
+                        <th scope="col">Title</th>
+                        <th scope="col">Platform</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Markdown filename</th>
+                        <th scope="col">Result</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var entry in Model.Preview.Entries)
+                    {
+                        <tr data-import-disposition="@entry.Disposition">
+                            <td>@entry.RowNumber</td>
+                            <td>
+                                <strong>@(string.IsNullOrWhiteSpace(entry.Title) ? "Missing title" : entry.Title)</strong>
+                                @foreach (var warning in entry.Warnings)
+                                {
+                                    <span class="import-row-warning">@warning</span>
+                                }
+                            </td>
+                            <td>@(entry.Platform ?? "—")</td>
+                            <td>@(entry.Status is null ? "—" : GameStatuses.GetLabel(entry.Status))</td>
+                            <td class="import-filename">@(string.IsNullOrWhiteSpace(entry.ProposedId) ? "—" : $"{entry.ProposedId}.md")</td>
+                            <td>
+                                <span class="import-disposition import-disposition-@entry.Disposition">@entry.Disposition</span>
+                                @if (!string.IsNullOrWhiteSpace(entry.Conflict))
+                                {
+                                    <span class="import-row-warning">@entry.Conflict</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <form method="post" asp-page-handler="Import" class="import-confirm-form">
+            <input type="hidden" name="importToken" value="@Model.ImportToken" />
+            <p>
+                This will create <strong>@Model.Preview.ReadyCount Markdown notes</strong> in your Games folder.
+                It will not overwrite existing files.
+            </p>
+            <div class="form-actions">
+                <button class="btn btn-primary" type="submit" disabled="@(Model.Preview.ReadyCount == 0)">
+                    Import @Model.Preview.ReadyCount notes
+                </button>
+                <a class="btn btn-link" asp-page="/Games/Import">Cancel</a>
+            </div>
+        </form>
+    </section>
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

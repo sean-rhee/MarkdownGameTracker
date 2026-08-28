@@ -14,7 +14,7 @@ public sealed class DetailsModel(
 {
     private static readonly HashSet<string> PrimaryFields = new(StringComparer.OrdinalIgnoreCase)
     {
-        "type", "hobby", "status", "rating"
+        "type", "hobby", "title", "aliases", "source", "hltb_added", "hltb_updated", "status", "rating"
     };
 
     public GameNote Game { get; private set; } = null!;

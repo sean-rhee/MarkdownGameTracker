@@ -93,6 +93,7 @@ public sealed class GameCrudTests
         Assert.NotNull(created);
         Assert.True(File.Exists(app.GamePath("Hades II")));
         Assert.Equal("game", created.Frontmatter["type"]?.ToString());
+        Assert.Equal("Hades II", created.Frontmatter["title"]?.ToString());
         Assert.Equal("endless", created.Status);
         Assert.Contains("status: endless", await File.ReadAllTextAsync(app.GamePath("Hades II")));
 
@@ -126,6 +127,30 @@ public sealed class GameCrudTests
     }
 
     [Fact]
+    public async Task Display_titles_preserve_punctuation_while_filenames_stay_obsidian_friendly()
+    {
+        using var app = new TestApp();
+
+        var response = await app.Client.PostAsJsonAsync(
+            "/api/games",
+            new CreateGameRequest(
+                "Clair Obscur: Expedition 33",
+                "completed",
+                null,
+                null,
+                new Dictionary<string, object?> { ["platform"] = "PC" }));
+        var game = await response.Content.ReadFromJsonAsync<GameNote>();
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.NotNull(game);
+        Assert.Equal("Clair Obscur - Expedition 33", game.Id);
+        Assert.Equal("Clair Obscur: Expedition 33", game.Title);
+        Assert.Equal("Clair Obscur: Expedition 33", game.Frontmatter["title"]?.ToString());
+        Assert.True(game.Frontmatter.ContainsKey("aliases"));
+        Assert.True(File.Exists(app.GamePath("Clair Obscur - Expedition 33")));
+    }
+
+    [Fact]
     public async Task Create_rejects_duplicates_invalid_ratings_and_unsafe_titles()
     {
         using var app = new TestApp();
@@ -151,4 +176,3 @@ public sealed class GameCrudTests
         Assert.False(File.Exists(Path.Combine(app.RootPath, "outside.md")));
     }
 }
-

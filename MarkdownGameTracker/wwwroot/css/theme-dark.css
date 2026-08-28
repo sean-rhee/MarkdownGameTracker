@@ -129,6 +129,26 @@ html[data-theme="dark"] .game-title-suggestion-cover-placeholder {
   background: #1d3b53;
 }
 
+html[data-theme="dark"] .game-card-platform,
+html[data-theme="dark"] .import-summary span {
+  color: #b9dcf5;
+}
+
+html[data-theme="dark"] .import-row-warning {
+  color: #f0c27b;
+}
+
+html[data-theme="dark"] .import-disposition-ready {
+  color: #a9dfcf;
+  background: #1c4439;
+}
+
+html[data-theme="dark"] .import-disposition-conflict,
+html[data-theme="dark"] .import-disposition-invalid {
+  color: #f0c27b;
+  background: #4d391d;
+}
+
 html[data-theme="dark"] .markdown-editor-shell {
   border-color: #36566f;
 }

@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 using MarkdownGameTracker.Models;
 using Microsoft.Extensions.Options;
 
@@ -98,14 +99,17 @@ public sealed class MarkdownGameRepository : IGameRepository
         CreateGameRequest request,
         CancellationToken cancellationToken)
     {
-        var title = ValidateTitle(request.Title);
+        var title = ValidateDisplayTitle(request.Title);
         var status = GameStatuses.NormalizeRequired(request.Status);
         ValidateRating(request.Rating);
+        var id = request.Id is null
+            ? CreateSafeId(title)
+            : ValidateId(request.Id);
 
         await _writeLock.WaitAsync(cancellationToken);
         try
         {
-            if (FindExistingFile(title) is not null)
+            if (FindExistingFile(id) is not null)
             {
                 throw new GameAlreadyExistsException(title);
             }
@@ -115,7 +119,12 @@ public sealed class MarkdownGameRepository : IGameRepository
                 status,
                 request.Rating,
                 includeDefaults: true);
-            var filePath = GetSafeFilePath(title);
+            frontmatter[GameNoteMetadata.TitleKey] = title;
+            if (!string.Equals(id, title, StringComparison.Ordinal))
+            {
+                frontmatter.TryAdd("aliases", new List<object?> { title });
+            }
+            var filePath = GetSafeFilePath(id);
             await WriteAtomicallyAsync(filePath, frontmatter, request.Markdown ?? string.Empty, cancellationToken);
             return await ReadAsync(filePath, cancellationToken);
         }
@@ -150,8 +159,18 @@ public sealed class MarkdownGameRepository : IGameRepository
                 return null;
             }
 
-            var title = request.Title is null ? existing.Title : ValidateTitle(request.Title);
-            var destinationPath = GetSafeFilePath(title);
+            var title = request.Title is null ? existing.Title : ValidateDisplayTitle(request.Title);
+            var destinationId = existing.Id;
+            if (!string.Equals(existing.Title, title, StringComparison.Ordinal))
+            {
+                var oldBaseId = CreateSafeId(existing.Title);
+                var suffix = existing.Id.StartsWith(oldBaseId, StringComparison.OrdinalIgnoreCase)
+                    ? existing.Id[oldBaseId.Length..]
+                    : string.Empty;
+                destinationId = CreateSafeId(title, suffix);
+            }
+
+            var destinationPath = GetSafeFilePath(destinationId);
 
             if (!string.Equals(sourcePath, destinationPath, StringComparison.OrdinalIgnoreCase)
                 && FindExistingFile(title) is not null)
@@ -185,6 +204,7 @@ public sealed class MarkdownGameRepository : IGameRepository
             }
 
             mergedFrontmatter["type"] = "game";
+            mergedFrontmatter[GameNoteMetadata.TitleKey] = title;
             mergedFrontmatter.TryAdd("hobby", new List<object?> { "[[Gaming]]" });
             if (status is not null)
             {
@@ -242,11 +262,12 @@ public sealed class MarkdownGameRepository : IGameRepository
     {
         var contents = await File.ReadAllTextAsync(filePath, cancellationToken);
         var (frontmatter, markdown) = _documentSerializer.Parse(contents, filePath);
-        var title = Path.GetFileNameWithoutExtension(filePath);
+        var id = Path.GetFileNameWithoutExtension(filePath);
+        var title = ReadString(frontmatter, GameNoteMetadata.TitleKey);
 
         return new GameNote(
-            title,
-            title,
+            id,
+            string.IsNullOrWhiteSpace(title) ? id : title.Trim(),
             GameStatuses.NormalizeForRead(ReadString(frontmatter, "status")),
             ReadRating(frontmatter),
             markdown,
@@ -286,7 +307,7 @@ public sealed class MarkdownGameRepository : IGameRepository
 
     private string? FindExistingFile(string id)
     {
-        var safeId = ValidateTitle(id);
+        var safeId = ValidateId(id);
         return Directory
             .EnumerateFiles(_gamesDirectory, "*.md", SearchOption.TopDirectoryOnly)
             .FirstOrDefault(path => string.Equals(
@@ -306,7 +327,48 @@ public sealed class MarkdownGameRepository : IGameRepository
         return filePath;
     }
 
-    private static string ValidateTitle(string? title)
+    public static string CreateSafeId(string title, string suffix = "")
+    {
+        var displayTitle = ValidateDisplayTitle(title);
+        var builder = new StringBuilder(displayTitle.Length + suffix.Length);
+        foreach (var character in displayTitle)
+        {
+            if (InvalidTitleCharacters.Contains(character))
+            {
+                builder.Append(character == ':' ? " -" : " ");
+            }
+            else
+            {
+                builder.Append(character);
+            }
+        }
+
+        var safeBase = Regex.Replace(builder.ToString(), @"\s+", " ").Trim(' ', '.');
+        if (safeBase.Length == 0)
+        {
+            safeBase = "Game";
+        }
+
+        if (ReservedWindowsNames.Contains(safeBase))
+        {
+            safeBase = $"Game - {safeBase}";
+        }
+
+        var maximumBaseLength = 200 - suffix.Length;
+        if (maximumBaseLength <= 0)
+        {
+            throw new ArgumentException("The note filename suffix is too long.", nameof(suffix));
+        }
+
+        if (safeBase.Length > maximumBaseLength)
+        {
+            safeBase = safeBase[..maximumBaseLength].TrimEnd(' ', '.');
+        }
+
+        return ValidateId($"{safeBase}{suffix}");
+    }
+
+    private static string ValidateDisplayTitle(string? title)
     {
         var trimmed = title?.Trim();
         if (string.IsNullOrWhiteSpace(trimmed))
@@ -319,14 +381,42 @@ public sealed class MarkdownGameRepository : IGameRepository
             throw new ArgumentException("Title cannot be longer than 200 characters.", nameof(title));
         }
 
+        if (trimmed.Any(char.IsControl))
+        {
+            throw new ArgumentException("Title contains unsupported control characters.", nameof(title));
+        }
+
+        if (trimmed is "." or ".."
+            || trimmed.Contains("../", StringComparison.Ordinal)
+            || trimmed.Contains("..\\", StringComparison.Ordinal))
+        {
+            throw new ArgumentException("Title contains an unsafe path sequence.", nameof(title));
+        }
+
+        return trimmed;
+    }
+
+    private static string ValidateId(string? id)
+    {
+        var trimmed = id?.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed))
+        {
+            throw new ArgumentException("Game-note ID is required.", nameof(id));
+        }
+
+        if (trimmed.Length > 200)
+        {
+            throw new ArgumentException("Game-note ID cannot be longer than 200 characters.", nameof(id));
+        }
+
         if (trimmed is "." or ".." || trimmed.IndexOfAny(InvalidTitleCharacters) >= 0)
         {
-            throw new ArgumentException("Title contains characters that cannot be used in a note filename.", nameof(title));
+            throw new ArgumentException("Game-note ID contains invalid filename characters.", nameof(id));
         }
 
         if (ReservedWindowsNames.Contains(trimmed.TrimEnd('.')))
         {
-            throw new ArgumentException("Title is reserved by the operating system.", nameof(title));
+            throw new ArgumentException("Game-note ID is reserved by the operating system.", nameof(id));
         }
 
         return trimmed;

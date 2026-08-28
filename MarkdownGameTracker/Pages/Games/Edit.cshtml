@@ -45,6 +45,24 @@
             </div>
         </div>
 
+        <div class="form-row game-metadata-form-row">
+            <div class="form-field">
+                <label asp-for="Input.Platform"></label>
+                <input asp-for="Input.Platform" class="form-control" />
+                <span asp-validation-for="Input.Platform" class="field-validation-error"></span>
+            </div>
+            <div class="form-field">
+                <label asp-for="Input.StartDate"></label>
+                <input asp-for="Input.StartDate" class="form-control" type="date" />
+                <span asp-validation-for="Input.StartDate" class="field-validation-error"></span>
+            </div>
+            <div class="form-field">
+                <label asp-for="Input.CompletionDate"></label>
+                <input asp-for="Input.CompletionDate" class="form-control" type="date" />
+                <span asp-validation-for="Input.CompletionDate" class="field-validation-error"></span>
+            </div>
+        </div>
+
         <partial name="_MarkdownEditor" for="Input" />
 
         <div class="form-actions">

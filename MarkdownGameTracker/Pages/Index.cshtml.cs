@@ -62,7 +62,11 @@ public sealed class IndexModel(
 
     public bool IsSearchMatch(GameNote game) => MatchesSearch(game, Search);
 
-    public static string GetSearchText(GameNote game) => $"{game.Title}\n{game.Markdown}";
+    public static string GetSearchText(GameNote game) =>
+        $"{game.Title}\n{GetPlatform(game)}\n{game.Markdown}";
+
+    public static string? GetPlatform(GameNote game) =>
+        GameNoteMetadata.GetString(game, GameNoteMetadata.PlatformKey);
 
     private static bool MatchesSearch(GameNote game, string? search)
     {

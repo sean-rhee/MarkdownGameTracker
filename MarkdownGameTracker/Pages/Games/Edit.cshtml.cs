@@ -26,6 +26,9 @@ public sealed class EditModel(IGameRepository repository) : PageModel
             Title = game.Title,
             Status = game.Status ?? GameStatuses.Planned,
             Rating = game.Rating,
+            Platform = GameNoteMetadata.GetString(game, GameNoteMetadata.PlatformKey),
+            StartDate = GameNoteMetadata.GetDate(game, GameNoteMetadata.StartDateKey),
+            CompletionDate = GameNoteMetadata.GetDate(game, GameNoteMetadata.CompletionDateKey),
             Markdown = game.Markdown
         };
         return Page();
@@ -39,7 +42,7 @@ public sealed class EditModel(IGameRepository repository) : PageModel
             return Page();
         }
 
-        var fieldsToClear = new Dictionary<string, object?>();
+        var fieldsToClear = Input.ToFrontmatter();
         if (Input.Rating is null)
         {
             fieldsToClear["rating"] = null;

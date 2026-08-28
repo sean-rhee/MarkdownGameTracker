@@ -63,9 +63,15 @@
 }
 
 .game-card:hover {
+  z-index: 10;
   transform: translateY(-3px);
   border-color: #a8cce9;
   box-shadow: var(--shadow);
+}
+
+.game-card:focus-within,
+.game-card:has(.dropdown-menu.show) {
+  z-index: 10;
 }
 
 .game-card-top {
@@ -78,6 +84,18 @@
 .game-card h3 {
   margin: 1.25rem 0 0.65rem;
   font-size: 1.35rem;
+}
+
+.game-card-platform {
+  align-self: flex-start;
+  margin: -0.2rem 0 0.65rem;
+  padding: 0.28rem 0.55rem;
+  color: #2e6f9f;
+  border: 1px solid rgba(57, 127, 189, 0.2);
+  border-radius: 999px;
+  background: var(--blue-100);
+  font-size: 0.68rem;
+  font-weight: 750;
 }
 
 .game-card p {
@@ -416,6 +434,155 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1rem;
+}
+
+.game-metadata-form-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.import-upload-card {
+  max-width: 760px;
+}
+
+.import-upload-card h2,
+.import-result-card h2,
+.import-preview-heading h2 {
+  margin: 0.25rem 0 0;
+  font-size: clamp(1.35rem, 3vw, 1.7rem);
+}
+
+.import-upload-card form {
+  margin-top: 1.2rem;
+}
+
+.import-result-card,
+.import-preview {
+  padding: clamp(1.2rem, 3vw, 1.7rem);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: 0 7px 22px rgba(69, 116, 158, 0.07);
+}
+
+.import-preview-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.import-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+.import-summary span {
+  padding: 0.4rem 0.6rem;
+  color: var(--ink-soft);
+  border-radius: 999px;
+  background: var(--blue-100);
+  font-size: 0.72rem;
+}
+
+.import-preview-note {
+  margin: 1rem 0;
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+}
+
+.import-preview-table-wrap {
+  max-height: min(62vh, 720px);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.import-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.import-preview-table th,
+.import-preview-table td {
+  padding: 0.7rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.import-preview-table th {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  color: var(--ink-soft);
+  background: var(--blue-100);
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.import-preview-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.import-preview-table tr[data-import-disposition="conflict"],
+.import-preview-table tr[data-import-disposition="invalid"] {
+  background: rgba(246, 224, 191, 0.2);
+}
+
+.import-filename {
+  min-width: 220px;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+
+.import-row-warning {
+  margin-top: 0.25rem;
+  display: block;
+  color: #95601f;
+  font-size: 0.7rem;
+}
+
+.import-disposition {
+  padding: 0.26rem 0.48rem;
+  display: inline-flex;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.import-disposition-ready {
+  color: #235e4f;
+  background: #e4f6f0;
+}
+
+.import-disposition-conflict,
+.import-disposition-invalid {
+  color: #845318;
+  background: #fff0d8;
+}
+
+.import-confirm-form {
+  margin-top: 1.2rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--border);
+}
+
+.import-confirm-form p {
+  color: var(--ink-soft);
+}
+
+.import-errors {
+  margin: 1rem 0;
+  padding: 0.85rem 1rem;
+  color: #8b2f3d;
+  border-radius: 10px;
+  background: #fde8ec;
 }
 
 .field-help {
