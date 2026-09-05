@@ -19,6 +19,7 @@
         <span class="dropdown-header">Move to</span>
         <input type="hidden" name="currentStatus" value="@Model.ReturnStatus" />
         <input type="hidden" name="search" value="@Model.Search" />
+        <input type="hidden" name="sort" value="@Model.Sort" />
         @foreach (var status in GameStatuses.All)
         {
             var isCurrentStatus = string.Equals(Model.Status, status, StringComparison.OrdinalIgnoreCase);

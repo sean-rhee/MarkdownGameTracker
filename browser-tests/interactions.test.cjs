@@ -80,6 +80,27 @@ after(async () => {
   }
 });
 
+test('library sorting persists through search, tabs, reload, and returning home', async () => {
+  await seed('Alpha', 'active', 'Shared notes');
+  await seed('Zulu', 'active', 'Shared notes');
+  await seed('Finished', 'completed', 'Shared notes');
+  await page.goto('/');
+  await page.getByLabel('Sort by').selectOption('title-desc');
+  await page.waitForURL(url => url.searchParams.get('Sort') === 'title-desc');
+  assert.deepEqual(await page.locator('[data-game-card] h3').allTextContents(), ['Zulu', 'Alpha']);
+  await page.getByRole('combobox', { name: 'Search', exact: true }).fill('Shared');
+  await page.reload();
+  assert.equal(await page.getByLabel('Sort by').inputValue(), 'title-desc');
+  await page.getByRole('navigation', { name: 'Game status' }).getByRole('link', { name: 'Completed' }).click();
+  assert.equal(await page.getByLabel('Sort by').inputValue(), 'title-desc');
+  assert.equal(await page.getByRole('combobox', { name: 'Search', exact: true }).inputValue(), 'Shared');
+  await page.goto('/');
+  assert.equal(await page.getByLabel('Sort by').inputValue(), 'title-desc');
+  assert.deepEqual(await page.locator('[data-game-card] h3').allTextContents(), ['Zulu', 'Alpha']);
+  await page.setViewportSize({width: 390, height: 844});
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+});
+
 test('editor preview, save, clear, and delete confirmation persist the intended content', async () => {
   await page.goto('/Games/Create');
   await page.getByLabel('Game title', { exact: true }).fill('Browser Journal');

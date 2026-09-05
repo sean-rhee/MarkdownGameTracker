@@ -40,6 +40,7 @@
                asp-page="/Index"
                asp-route-status="@tab.Value"
                asp-route-search="@Model.Search"
+               asp-route-sort="@Model.Sort"
                aria-current="@(tab.Value == Model.SelectedStatus ? "page" : null)">
                 <span>@tab.Label</span>
                 <span class="status-tab-count">@tab.Count</span>
@@ -75,8 +76,18 @@
         <a class="btn btn-link"
            asp-page="/Index"
            asp-route-status="@Model.SelectedStatus"
+           asp-route-sort="@Model.Sort"
            data-search-clear
            hidden="@string.IsNullOrWhiteSpace(Model.Search)">Clear</a>
+        <div class="library-sort">
+            <label asp-for="Sort">Sort by</label>
+            <select asp-for="Sort" class="form-select" data-library-sort>
+                <option value="title">Title: A–Z</option>
+                <option value="title-desc">Title: Z–A</option>
+                <option value="updated">Recently updated</option>
+                <option value="rating">Highest rated</option>
+            </select>
+        </div>
     </form>
 
     <div class="empty-state" data-search-empty-state hidden="@(Model.VisibleGameCount != 0)">
@@ -104,9 +115,9 @@
                 <div class="game-card-content">
                     <div class="game-card-top">
                         <partial name="_InlineStatusControl"
-                                 model="@(new InlineStatusControlModel(game.Id, game.Status, "/Index", Model.SelectedStatus, Model.Search))" />
+                                 model="@(new InlineStatusControlModel(game.Id, game.Status, "/Index", Model.SelectedStatus, Model.Search, Model.Sort))" />
                         <partial name="_InlineRatingControl"
-                                 model="@(new InlineRatingControlModel(game.Id, game.Rating, "/Index", Model.SelectedStatus, Model.Search))" />
+                                 model="@(new InlineRatingControlModel(game.Id, game.Rating, "/Index", Model.SelectedStatus, Model.Search, Model.Sort))" />
                     </div>
                     <h3>@game.Title</h3>
                     @if (IndexModel.GetPlatform(game) is { } platform)

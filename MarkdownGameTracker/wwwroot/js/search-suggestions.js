@@ -206,6 +206,7 @@
   });
 
   form.addEventListener("submit", closeSuggestions);
+  form.querySelector("[data-library-sort]")?.addEventListener("change", () => form.requestSubmit());
   closeSuggestions();
   updateResults(false);
 })();

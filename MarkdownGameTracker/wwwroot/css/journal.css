@@ -96,6 +96,9 @@ html[data-theme="dark"] .status-tab.active {
 .form-control, .form-select { border-radius: 7px; font-size: 0.9rem; }
 .filter-bar .form-control { min-height: 42px; padding-left: 0.9rem; }
 .filter-bar .btn { min-height: 42px; }
+.library-sort { display: flex; align-items: center; gap: 0.65rem; margin-left: auto; }
+.library-sort label { white-space: nowrap; color: var(--ink-soft); font-size: 0.75rem; }
+.library-sort .form-select { min-height: 42px; width: 190px; }
 .game-grid { gap: 1.5rem; }
 .game-card,
 html[data-theme="dark"] .game-card { box-shadow: none; }
@@ -133,6 +136,8 @@ html[data-theme="dark"] .game-card { box-shadow: none; }
   .status-tabs { gap: 1.2rem; }
   .filter-bar { flex-direction: row; align-items: center; flex-wrap: wrap; }
   .filter-search { min-width: 120px; max-width: none; }
+  .library-sort { width: 100%; margin-top: 0.5rem; }
+  .library-sort .form-select { flex: 1; width: auto; }
   .theme-toggle { width: auto; height: auto; }
   .game-card-artwork { height: 190px; flex-basis: 190px; }
 }

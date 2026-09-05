@@ -16,6 +16,14 @@ public sealed class IndexModel(
     [BindProperty(SupportsGet = true)]
     public string? Status { get; set; }
 
+    [BindProperty(SupportsGet = true)]
+    public string? Sort { get; set; }
+
+    private const string SortCookie = "game-garden-sort";
+
+    private static string NormalizeSort(string? sort) => sort is "updated" or "rating" or "title-desc"
+        ? sort : "title";
+
     public string SelectedStatus { get; private set; } = GameStatuses.Active;
 
     public IReadOnlyList<GameNote> Games { get; private set; } = [];
@@ -35,14 +43,32 @@ public sealed class IndexModel(
             ? normalizedStatus
             : GameStatuses.Active;
         Status = SelectedStatus;
+        Sort = NormalizeSort(Sort ?? Request.Cookies[SortCookie]);
+        Response.Cookies.Append(SortCookie, Sort, new CookieOptions
+        {
+            MaxAge = TimeSpan.FromDays(365),
+            HttpOnly = true,
+            SameSite = SameSiteMode.Lax,
+            Secure = Request.IsHttps,
+            Path = "/"
+        });
 
         var allGames = await repository.ListAsync(null, null, cancellationToken);
-        Games = allGames
+        var statusGames = allGames
             .Where(game => string.Equals(
                 game.Status,
                 SelectedStatus,
-                StringComparison.OrdinalIgnoreCase))
-            .ToArray();
+                StringComparison.OrdinalIgnoreCase));
+        var orderedGames = Sort switch
+        {
+            "updated" => statusGames.OrderByDescending(game => game.LastModifiedUtc)
+                .ThenBy(game => game.Title, StringComparer.OrdinalIgnoreCase),
+            "rating" => statusGames.OrderByDescending(game => game.Rating)
+                .ThenBy(game => game.Title, StringComparer.OrdinalIgnoreCase),
+            "title-desc" => statusGames.OrderByDescending(game => game.Title, StringComparer.OrdinalIgnoreCase),
+            _ => statusGames.OrderBy(game => game.Title, StringComparer.OrdinalIgnoreCase)
+        };
+        Games = orderedGames.ThenBy(game => game.Id, StringComparer.Ordinal).ToArray();
         VisibleGameCount = Games.Count(IsSearchMatch);
         SearchSuggestions = Games
             .Select(game => game.Title)
@@ -107,7 +133,8 @@ public sealed class IndexModel(
         return RedirectToPage(new
         {
             status = returnStatus,
-            search
+            search,
+            sort = NormalizeSort(Sort ?? Request.Cookies[SortCookie])
         });
     }
 
@@ -143,7 +170,8 @@ public sealed class IndexModel(
         return RedirectToPage(new
         {
             status = returnStatus,
-            search
+            search,
+            sort = NormalizeSort(Sort ?? Request.Cookies[SortCookie])
         });
     }
 

@@ -22,6 +22,43 @@ namespace MarkdownGameTracker.Tests;
 public sealed class FrontendTests
 {
     [Theory]
+    [InlineData("title", "Alpha,Beta,Gamma,Zero")]
+    [InlineData("title-desc", "Zero,Gamma,Beta,Alpha")]
+    [InlineData("rating", "Beta,Gamma,Zero,Alpha")]
+    [InlineData("updated", "Gamma,Zero,Alpha,Beta")]
+    [InlineData("invalid", "Alpha,Beta,Gamma,Zero")]
+    public async Task Library_sorts_notes_and_remembers_the_choice(string sort, string expected)
+    {
+        using var app = new TestApp();
+        foreach (var (title, rating, day) in new[]
+                 { ("Alpha", "", 2), ("Beta", "rating: 9\n", 1), ("Gamma", "rating: 9\n", 4), ("Zero", "rating: 0\n", 3) })
+        {
+            app.WriteGame(title, $"---\ntype: game\nstatus: active\n{rating}---\nShared notes");
+            File.SetLastWriteTimeUtc(app.GamePath(title), new DateTime(2026, 1, day, 0, 0, 0, DateTimeKind.Utc));
+        }
+
+        static string CardOrder(string html) => string.Join(",", Regex.Matches(html, "data-game-id=\"([^\"]+)\"")
+            .Select(match => match.Groups[1].Value));
+        var html = await app.Client.GetStringAsync($"/?sort={sort}&search=Shared");
+        Assert.Equal(expected, CardOrder(html));
+        Assert.Equal(expected, CardOrder(await app.Client.GetStringAsync("/")));
+        var selected = sort == "invalid" ? "title" : sort;
+        Assert.Contains($"sort={selected}", html);
+
+        // Inline edits retain this page's sort even if the browser preference changes.
+        await app.Client.GetStringAsync("/?sort=title-desc");
+        var response = await app.Client.PostAsync("/?handler=ChangeRating", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = TestHelpers.GetAntiforgeryToken(html),
+            ["id"] = "Alpha", ["rating"] = "8", ["currentStatus"] = "active",
+            ["search"] = "Shared", ["sort"] = selected
+        }));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains($"sort={selected}", response.RequestMessage!.RequestUri!.Query);
+        Assert.Contains("search=Shared", response.RequestMessage.RequestUri.Query);
+    }
+
+    [Theory]
     [InlineData("![image](missing.png){onerror=alert(1)}")]
     [InlineData("[link](https://example.com){onclick=alert(1)}")]
     [InlineData("# Heading {onmouseover=alert(1)}")]

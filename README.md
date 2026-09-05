@@ -8,6 +8,7 @@ The root page at [`http://localhost:5297/`](http://localhost:5297/) is a respons
 
 - Five status tabs with counts for Active, Endless, Completed, Inactive, and Plan to play
 - Search scoped to the selected status tab
+- Library sorting by title (A–Z or Z–A), recently updated, or highest rated; remembered in your browser. Recently updated uses the note file's modification time, and unrated games appear last when sorting by rating.
 - Game cards with status, rating, platform, and note excerpts
 - Clickable status badges for moving a game between statuses directly from its card
 - A day/night theme toggle that follows the device preference and remembers your choice
