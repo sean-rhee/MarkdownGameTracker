@@ -148,6 +148,10 @@ internal sealed class FakeIgdbHttpHandler : HttpMessageHandler
 
     public List<string> MultiQueries { get; } = [];
 
+    public Func<string, HttpResponseMessage?>? GameResponse { get; set; }
+
+    public Func<string, HttpResponseMessage?>? MultiResponse { get; set; }
+
     protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,
         CancellationToken cancellationToken)
@@ -173,6 +177,10 @@ internal sealed class FakeIgdbHttpHandler : HttpMessageHandler
         if (request.RequestUri?.AbsolutePath.EndsWith("/multiquery", StringComparison.Ordinal) == true)
         {
             MultiQueries.Add(query);
+            if (MultiResponse?.Invoke(query) is { } multiResponse)
+            {
+                return multiResponse;
+            }
             return JsonResponse("""
                 [{
                   "name":"game0",
@@ -187,6 +195,10 @@ internal sealed class FakeIgdbHttpHandler : HttpMessageHandler
         }
 
         GameQueries.Add(query);
+        if (GameResponse?.Invoke(query) is { } gameResponse)
+        {
+            return gameResponse;
+        }
 
         return query.Contains("where id = 202", StringComparison.Ordinal)
                || query.Contains("where id = (202)", StringComparison.Ordinal)

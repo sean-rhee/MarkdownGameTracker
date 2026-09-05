@@ -228,6 +228,74 @@ public sealed class IgdbTests
         Assert.Equal(1, handler.TokenRequestCount);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Card_artwork_falls_back_to_the_same_match_as_details_and_caches_it(bool failFirstSearch)
+    {
+        const string title = "Yakuza 0 Director's Cut";
+        const string matchedGame = """
+            [{"id":303,"name":"Yakuza 0: Director's Cut",
+              "cover":{"image_id":"yakuza-cover"},
+              "artworks":[{"image_id":"yakuza-art","width":1920,"height":1080}]}]
+            """;
+        static HttpResponseMessage Json(string body) => new(HttpStatusCode.OK)
+        {
+            Content = new StringContent(body, Encoding.UTF8, "application/json")
+        };
+        var shouldFail = failFirstSearch;
+        using var handler = new FakeIgdbHttpHandler
+        {
+            MultiResponse = _ => Json("""[{"name":"game0","result":[]}]"""),
+            GameResponse = query =>
+            {
+                if (!query.StartsWith("search", StringComparison.Ordinal))
+                {
+                    return Json("[]");
+                }
+
+                if (shouldFail)
+                {
+                    shouldFail = false;
+                    return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
+                }
+
+                return Json(matchedGame);
+            }
+        };
+        using var client = new HttpClient(handler);
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var service = CreateService(client, cache);
+        IgdbArtworkLookup[] lookups = [new("Local filename", title, null)];
+
+        if (failFirstSearch)
+        {
+            var failed = await service.GetCardArtworkAsync(lookups, CancellationToken.None);
+            Assert.Equal("unavailable", failed.Status);
+            Assert.Empty(failed.Artwork);
+        }
+
+        var cards = await service.GetCardArtworkAsync(lookups, CancellationToken.None);
+        var card = Assert.Single(cards.Artwork);
+        Assert.Equal("Local filename", card.GameId);
+        Assert.Equal(303, card.IgdbGameId);
+        Assert.EndsWith("/yakuza-art.jpg", card.ArtworkUrl);
+        Assert.Contains(handler.GameQueries, query =>
+            query.Contains("search \"Yakuza 0 Director's Cut\"", StringComparison.Ordinal)
+            && query.Contains("where version_parent = null", StringComparison.Ordinal));
+
+        var queryCount = handler.GameQueries.Count + handler.MultiQueries.Count;
+        var cached = await service.GetCardArtworkAsync(
+            [new IgdbArtworkLookup("Renamed file", title, null)], CancellationToken.None);
+        Assert.Equal("Renamed file", Assert.Single(cached.Artwork).GameId);
+        Assert.Equal(queryCount, handler.GameQueries.Count + handler.MultiQueries.Count);
+
+        var details = await service.GetDescriptionAsync(title, null, CancellationToken.None);
+        Assert.Equal(details.IgdbGameId, card.IgdbGameId);
+        Assert.Equal(details.MatchedTitle, card.MatchedTitle);
+        Assert.EndsWith("/yakuza-art.jpg", details.HeroUrl);
+    }
+
     [Fact]
     public async Task Igdb_access_token_is_shared_across_transient_service_instances()
     {

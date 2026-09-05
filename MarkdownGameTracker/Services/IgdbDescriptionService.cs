@@ -180,8 +180,27 @@ internal sealed class IgdbDescriptionService(
                 var requested = batch[index];
                 resultsByName.TryGetValue($"game{index}", out var matches);
                 var match = matches?.Result.FirstOrDefault(game =>
-                                string.Equals(game.Name, requested.Title.Trim(), StringComparison.OrdinalIgnoreCase))
-                            ?? matches?.Result.FirstOrDefault();
+                                string.Equals(game.Name, requested.Title.Trim(), StringComparison.OrdinalIgnoreCase));
+                if (match is null)
+                {
+                    // Match the details page's search fallback when punctuation or edition
+                    // names differ from IGDB. Do not cache a transient search failure as a miss.
+                    var title = requested.Title.Trim();
+                    var searchQuery = $"search \"{EscapeSearchText(title)}\"; "
+                                      + "fields id,name,cover.image_id,artworks.image_id,artworks.width,artworks.height; "
+                                      + "where version_parent = null; limit 25;";
+                    var searchResult = await apiClient.QueryGamesAsync(title, searchQuery, cancellationToken);
+                    allQueriesSucceeded &= searchResult.Succeeded;
+                    if (!searchResult.Succeeded)
+                    {
+                        continue;
+                    }
+
+                    match = searchResult.Games.FirstOrDefault(game =>
+                                string.Equals(game.Name, title, StringComparison.OrdinalIgnoreCase))
+                            ?? searchResult.Games.FirstOrDefault();
+                }
+
                 CacheArtwork(requested, match, artwork);
             }
         }

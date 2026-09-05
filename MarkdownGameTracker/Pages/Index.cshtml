@@ -10,18 +10,22 @@
 }
 
 <section class="hero-panel">
-    <div>
+    <div class="journal-intro">
         <span class="eyebrow">Your personal game journal</span>
-        <h1>What are you playing?</h1>
+        <h1>What are you <em>playing?</em></h1>
         <p>Track the backlog, remember where you left off, and keep every thought in Markdown.</p>
     </div>
-    <a class="btn btn-primary btn-lg" asp-page="/Games/Create">+ Add a game</a>
+    <div class="journal-aside">
+        <span class="journal-total">@Model.StatusTabs.Sum(tab => tab.Count).ToString("D2")</span>
+        <span class="journal-caption">games in your garden</span>
+        <a class="btn btn-primary" asp-page="/Games/Create">+ Add a game</a>
+    </div>
 </section>
 
 <section class="library-section">
     <div class="section-heading">
         <div>
-            <span class="eyebrow">The library</span>
+            <span class="eyebrow">Your collection</span>
             <h2>Game notes</h2>
         </div>
         <span class="result-count" data-search-result-count aria-live="polite">
