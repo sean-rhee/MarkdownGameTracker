@@ -1,0 +1,10 @@
+{
+  "name": "markdown-game-tracker-browser-tests",
+  "private": true,
+  "scripts": {
+    "test": "dotnet build ../MarkdownGameTracker/MarkdownGameTracker.csproj && node --test interactions.test.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}

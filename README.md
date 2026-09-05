@@ -165,4 +165,19 @@ The test suite uses a temporary vault and never writes to the real Obsidian vaul
 dotnet test .\MarkdownGameTracker.slnx
 ```
 
+The .NET suite covers API and form submissions, rejected writes, concurrent creates and partial updates, metadata preservation, and import validation.
+
+For real browser interactions, install Node.js 20 or newer and run the separate Playwright suite:
+
+```powershell
+cd browser-tests
+npm install
+npx playwright install chromium
+npm test
+```
+
+The browser suite builds the application, starts its own local server on an available port, and creates a temporary vault. It exercises editor formatting and previews, preview failure recovery, saving and clearing notes, rating and status menus, keyboard search, rename conflicts, and delete confirmation. Each scenario gets fresh browser storage and game files; the server and temporary vault are removed afterward. IGDB credentials are disabled for these tests.
+
+To use an installed Microsoft Edge instead of downloading Chromium, set `$env:BROWSER_CHANNEL = "msedge"` before `npm test` and omit the browser installation step. Run the browser suite after `dotnet test` finishes, since both use the application's build output.
+
 This first version has no authentication and should remain local-only. Add authentication and stronger concurrency controls before exposing it on a network or building a multi-user client.
