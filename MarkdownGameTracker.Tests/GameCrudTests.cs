@@ -21,6 +21,41 @@ namespace MarkdownGameTracker.Tests;
 
 public sealed class GameCrudTests
 {
+    [Theory]
+    [InlineData("Old (PC)", "New", "New (PC)")]
+    [InlineData("Old", "New/Game", "New Game")]
+    public async Task Rename_conflicts_preserve_both_notes(string sourceId, string title, string destinationId)
+    {
+        using var app = new TestApp();
+        const string source = "---\ntype: game\ntitle: Old\nstatus: active\n---\nSource notes";
+        const string destination = "---\ntype: game\nstatus: active\n---\nDestination notes";
+        app.WriteGame(sourceId, source);
+        app.WriteGame(destinationId, destination);
+
+        var response = await app.Client.PutAsJsonAsync($"/api/games/{Uri.EscapeDataString(sourceId)}", new { title });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal(source, await File.ReadAllTextAsync(app.GamePath(sourceId)));
+        Assert.Equal(destination, await File.ReadAllTextAsync(app.GamePath(destinationId)));
+    }
+
+    [Fact]
+    public async Task Rename_preserves_suffix_and_accepts_punctuation_in_display_title()
+    {
+        using var app = new TestApp();
+        app.WriteGame("Old (PC)", "---\ntype: game\ntitle: Old\nstatus: active\n---\nKeep notes");
+
+        var response = await app.Client.PutAsJsonAsync("/api/games/Old%20%28PC%29", new { title = "New/Game" });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var game = await response.Content.ReadFromJsonAsync<GameNote>();
+        Assert.NotNull(game);
+        Assert.Equal("New Game (PC)", game.Id);
+        Assert.Equal("New/Game", game.Title);
+        Assert.Equal("Keep notes", game.Markdown);
+        Assert.False(File.Exists(app.GamePath("Old (PC)")));
+    }
+
     [Fact]
     public async Task Get_reads_an_existing_obsidian_note()
     {

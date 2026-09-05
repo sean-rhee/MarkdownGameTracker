@@ -173,7 +173,7 @@ public sealed class MarkdownGameRepository : IGameRepository
             var destinationPath = GetSafeFilePath(destinationId);
 
             if (!string.Equals(sourcePath, destinationPath, StringComparison.OrdinalIgnoreCase)
-                && FindExistingFile(title) is not null)
+                && FindExistingFile(destinationId) is not null)
             {
                 throw new GameAlreadyExistsException(title);
             }

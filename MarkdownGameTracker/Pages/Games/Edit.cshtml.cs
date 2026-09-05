@@ -56,7 +56,7 @@ public sealed class EditModel(IGameRepository repository) : PageModel
                     Input.Title,
                     Input.Status,
                     Input.Rating,
-                    Input.Markdown,
+                    Input.Markdown ?? string.Empty,
                     fieldsToClear),
                 cancellationToken);
 

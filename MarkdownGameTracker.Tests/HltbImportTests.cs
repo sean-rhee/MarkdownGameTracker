@@ -8,6 +8,42 @@ namespace MarkdownGameTracker.Tests;
 
 public sealed class HltbImportTests
 {
+    [Fact]
+    public async Task Invalid_filenames_are_reported_per_row_and_valid_rows_can_be_imported()
+    {
+        using var app = new TestApp();
+        var csv = "Title,Platform,Playing,Backlog,Endless,Dropped,Completed,Retired\n"
+                  + "Good,PC,X,,,,,\n"
+                  + "..,PC,X,,,,,\n"
+                  + new string('x', 201) + ",PC,X,,,,,\n"
+                  + "Shared,..,X,,,,,\n"
+                  + "Shared,PC,X,,,,,\n";
+        var page = await app.Client.GetStringAsync("/Games/Import");
+        using var previewResponse = await PostCsvAsync(app, page, csv);
+        var preview = await previewResponse.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, previewResponse.StatusCode);
+        Assert.Contains("2</strong> ready", preview);
+        Assert.Contains("3</strong> invalid", preview);
+        Assert.Contains("Invalid note filename", preview);
+        Assert.Empty(Directory.GetFiles(Path.Combine(app.RootPath, "Games")));
+
+        var token = Regex.Match(preview, "name=\"importToken\" value=\"([^\"]+)\"").Groups[1].Value;
+        Assert.NotEmpty(token);
+        using var response = await app.Client.PostAsync("/Games/Import?handler=Import",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = TestHelpers.GetAntiforgeryToken(preview),
+                ["importToken"] = WebUtility.HtmlDecode(token)
+            }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("Created 2 notes", await response.Content.ReadAsStringAsync());
+        Assert.True(File.Exists(app.GamePath("Good")));
+        Assert.True(File.Exists(app.GamePath("Shared (PC)")));
+        Assert.Equal(2, Directory.GetFiles(Path.Combine(app.RootPath, "Games")).Length);
+    }
+
     private const string Csv = """
         "Title","Platform","Playing","Backlog","Endless","Dropped","Completed","Retired","Start Date","Completion Date","General Notes","Review Notes","Added","Updated"
         "Shared: Game","PC","","","","","X","","","2026-07-05","Finished it.","","2026-08-01 10:00:00","2026-08-01 10:00:00"
@@ -88,11 +124,11 @@ public sealed class HltbImportTests
         Assert.Contains("preview expired", await response.Content.ReadAsStringAsync());
     }
 
-    private static async Task<HttpResponseMessage> PostCsvAsync(TestApp app, string pageHtml)
+    private static async Task<HttpResponseMessage> PostCsvAsync(TestApp app, string pageHtml, string csv = Csv)
     {
         using var content = new MultipartFormDataContent();
         content.Add(new StringContent(TestHelpers.GetAntiforgeryToken(pageHtml)), "__RequestVerificationToken");
-        content.Add(new ByteArrayContent(Encoding.UTF8.GetBytes(Csv)), "CsvFile", "HLTB.csv");
+        content.Add(new ByteArrayContent(Encoding.UTF8.GetBytes(csv)), "CsvFile", "HLTB.csv");
         return await app.Client.PostAsync("/Games/Import?handler=Preview", content);
     }
 }

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.RegularExpressions;
 using Markdig;
+using Markdig.Extensions.GenericAttributes;
 
 namespace MarkdownGameTracker.Services;
 
@@ -10,10 +11,15 @@ public sealed class MarkdownRenderer
         "(?<attribute>href|src)=\"(?<url>[^\"]*)\"",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 
-    private readonly MarkdownPipeline _pipeline = new MarkdownPipelineBuilder()
-        .UseAdvancedExtensions()
-        .DisableHtml()
-        .Build();
+    private readonly MarkdownPipeline _pipeline = CreatePipeline();
+
+    private static MarkdownPipeline CreatePipeline()
+    {
+        var builder = new MarkdownPipelineBuilder().UseAdvancedExtensions().DisableHtml();
+        // Disabling raw HTML does not prevent arbitrary attributes on Markdown elements.
+        builder.Extensions.TryRemove<GenericAttributesExtension>();
+        return builder.Build();
+    }
 
     public string Render(string? markdown)
     {

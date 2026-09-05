@@ -21,6 +21,50 @@ namespace MarkdownGameTracker.Tests;
 
 public sealed class FrontendTests
 {
+    [Theory]
+    [InlineData("![image](missing.png){onerror=alert(1)}")]
+    [InlineData("[link](https://example.com){onclick=alert(1)}")]
+    [InlineData("# Heading {onmouseover=alert(1)}")]
+    public async Task Markdown_attributes_cannot_create_event_handlers(string markdown)
+    {
+        using var app = new TestApp();
+        app.WriteGame("Attributes", $"---\ntype: game\nstatus: active\n---\n{markdown}");
+
+        var response = await app.Client.PostAsJsonAsync("/api/markdown/preview", new { markdown });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var preview = await response.Content.ReadAsStringAsync();
+        var details = await app.Client.GetStringAsync("/Games/Details/Attributes");
+
+        Assert.DoesNotMatch(@"<[^>]+\son(?:error|click|mouseover)\s*=", preview);
+        Assert.DoesNotMatch(@"<[^>]+\son(?:error|click|mouseover)\s*=", details);
+    }
+
+    [Fact]
+    public async Task Clearing_the_editor_removes_saved_markdown()
+    {
+        using var app = new TestApp();
+        app.WriteGame("Clear Me", "---\ntype: game\nstatus: active\n---\nOld notes");
+        var html = await app.Client.GetStringAsync("/Games/Edit/Clear%20Me");
+        var response = await app.Client.PostAsync("/Games/Edit/Clear%20Me", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = TestHelpers.GetAntiforgeryToken(html),
+            ["Input.Title"] = "Clear Me",
+            ["Input.Status"] = "active",
+            ["Input.Markdown"] = string.Empty
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var game = await app.Client.GetFromJsonAsync<GameNote>("/api/games/Clear%20Me");
+        Assert.NotNull(game);
+        Assert.Equal(string.Empty, game.Markdown);
+
+        await app.Client.PutAsJsonAsync("/api/games/Clear%20Me", new { markdown = "API notes" });
+        var update = await app.Client.PutAsJsonAsync("/api/games/Clear%20Me", new { status = "completed" });
+        var updated = await update.Content.ReadFromJsonAsync<GameNote>();
+        Assert.NotNull(updated);
+        Assert.Equal("API notes", updated.Markdown);
+    }
+
     [Fact]
     public async Task Razor_frontend_lists_games_and_exposes_crud_pages()
     {

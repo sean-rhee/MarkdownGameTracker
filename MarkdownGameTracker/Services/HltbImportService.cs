@@ -182,21 +182,41 @@ public sealed class HltbImportService(IGameRepository repository) : IHltbImportS
         IReadOnlyList<HltbImportDraft> drafts,
         IReadOnlyList<GameNote> existingGames)
     {
-        var validDrafts = drafts.Where(draft => draft.Title.Length > 0).ToArray();
+        var baseIds = new Dictionary<int, string>();
+        var invalidEntries = new Dictionary<int, HltbImportEntry>();
+        foreach (var draft in drafts)
+        {
+            if (draft.Title.Length == 0 || draft.Status is null)
+            {
+                invalidEntries[draft.RowNumber] = ToEntry(draft, string.Empty, HltbImportDisposition.Invalid, null);
+                continue;
+            }
+
+            try
+            {
+                baseIds[draft.RowNumber] = MarkdownGameRepository.CreateSafeId(draft.Title);
+            }
+            catch (ArgumentException exception)
+            {
+                invalidEntries[draft.RowNumber] = InvalidFilenameEntry(draft, exception);
+            }
+        }
+
+        var validDrafts = drafts.Where(draft => baseIds.ContainsKey(draft.RowNumber)).ToArray();
         var titleCounts = validDrafts
             .GroupBy(draft => draft.Title, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
         var baseIdCounts = validDrafts
-            .GroupBy(draft => MarkdownGameRepository.CreateSafeId(draft.Title), StringComparer.OrdinalIgnoreCase)
+            .GroupBy(draft => baseIds[draft.RowNumber], StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
         var claimedIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var results = new List<HltbImportEntry>(drafts.Count);
 
         foreach (var draft in drafts)
         {
-            if (draft.Title.Length == 0 || draft.Status is null)
+            if (invalidEntries.TryGetValue(draft.RowNumber, out var invalidEntry))
             {
-                results.Add(ToEntry(draft, string.Empty, HltbImportDisposition.Invalid, null));
+                results.Add(invalidEntry);
                 continue;
             }
 
@@ -226,16 +246,25 @@ public sealed class HltbImportService(IGameRepository repository) : IHltbImportS
                 continue;
             }
 
-            var baseId = MarkdownGameRepository.CreateSafeId(draft.Title);
+            var baseId = baseIds[draft.RowNumber];
             var usePlatformSuffix = baseIdCounts[baseId] > 1
                                     || existingGames.Any(game => string.Equals(game.Id, baseId, StringComparison.OrdinalIgnoreCase));
             var ordinal = 1;
-            var proposedId = BuildProposedId(draft.Title, draft.Platform, usePlatformSuffix, ordinal);
-            while (claimedIds.Contains(proposedId)
-                   || existingGames.Any(game => string.Equals(game.Id, proposedId, StringComparison.OrdinalIgnoreCase)))
+            string proposedId;
+            try
             {
-                ordinal++;
                 proposedId = BuildProposedId(draft.Title, draft.Platform, usePlatformSuffix, ordinal);
+                while (claimedIds.Contains(proposedId)
+                       || existingGames.Any(game => string.Equals(game.Id, proposedId, StringComparison.OrdinalIgnoreCase)))
+                {
+                    ordinal++;
+                    proposedId = BuildProposedId(draft.Title, draft.Platform, usePlatformSuffix, ordinal);
+                }
+            }
+            catch (ArgumentException exception)
+            {
+                results.Add(InvalidFilenameEntry(draft, exception));
+                continue;
             }
 
             claimedIds.Add(proposedId);
@@ -244,6 +273,13 @@ public sealed class HltbImportService(IGameRepository repository) : IHltbImportS
 
         return results;
     }
+
+    private static HltbImportEntry InvalidFilenameEntry(HltbImportDraft draft, ArgumentException exception) =>
+        ToEntry(
+            draft with { Warnings = [.. draft.Warnings, $"Invalid note filename: {exception.Message}"] },
+            string.Empty,
+            HltbImportDisposition.Invalid,
+            null);
 
     private static string BuildProposedId(
         string title,
