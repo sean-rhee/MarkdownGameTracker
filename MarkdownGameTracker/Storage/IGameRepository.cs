@@ -4,6 +4,8 @@ namespace MarkdownGameTracker.Storage;
 
 public interface IGameRepository
 {
+    Task<GameLibraryScan> ScanAsync(string? status, string? search, CancellationToken cancellationToken);
+
     Task<IReadOnlyList<GameNote>> ListAsync(
         string? status,
         string? search,
@@ -23,3 +25,7 @@ public interface IGameRepository
 
 public sealed class GameAlreadyExistsException(string title)
     : Exception($"A game note named '{title}' already exists.");
+
+public sealed record GameLibraryScan(IReadOnlyList<GameNote> Games, IReadOnlyList<GameNoteDiagnostic> Diagnostics);
+
+public sealed record GameNoteDiagnostic(string FileName, string Message);

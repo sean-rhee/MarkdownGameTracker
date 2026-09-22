@@ -42,12 +42,6 @@ public sealed class EditModel(IGameRepository repository) : PageModel
             return Page();
         }
 
-        var fieldsToClear = Input.ToFrontmatter();
-        if (Input.Rating is null)
-        {
-            fieldsToClear["rating"] = null;
-        }
-
         try
         {
             var game = await repository.UpdateAsync(
@@ -57,7 +51,8 @@ public sealed class EditModel(IGameRepository repository) : PageModel
                     Input.Status,
                     Input.Rating,
                     Input.Markdown ?? string.Empty,
-                    fieldsToClear),
+                    Input.ToFrontmatter(),
+                    ClearRating: Input.Rating is null),
                 cancellationToken);
 
             if (game is null)
@@ -65,6 +60,11 @@ public sealed class EditModel(IGameRepository repository) : PageModel
                 return NotFound();
             }
 
+            if (!string.Equals(id, game.Id, StringComparison.Ordinal))
+            {
+                TempData["IgdbSelectionSource"] = id;
+                TempData["IgdbSelectionTarget"] = game.Id;
+            }
             TempData["SuccessMessage"] = $"Saved changes to {game.Title}.";
             return RedirectToPage("/Games/Details", new { id = game.Id });
         }

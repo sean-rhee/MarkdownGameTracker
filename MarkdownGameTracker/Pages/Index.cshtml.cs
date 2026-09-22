@@ -28,6 +28,8 @@ public sealed class IndexModel(
 
     public IReadOnlyList<GameNote> Games { get; private set; } = [];
 
+    public IReadOnlyList<GameNoteDiagnostic> NoteDiagnostics { get; private set; } = [];
+
     public int VisibleGameCount { get; private set; }
 
     public IReadOnlyList<string> SearchSuggestions { get; private set; } = [];
@@ -53,7 +55,9 @@ public sealed class IndexModel(
             Path = "/"
         });
 
-        var allGames = await repository.ListAsync(null, null, cancellationToken);
+        var scan = await repository.ScanAsync(null, null, cancellationToken);
+        var allGames = scan.Games;
+        NoteDiagnostics = scan.Diagnostics;
         var statusGames = allGames
             .Where(game => string.Equals(
                 game.Status,
@@ -86,25 +90,12 @@ public sealed class IndexModel(
             .ToArray();
     }
 
-    public bool IsSearchMatch(GameNote game) => MatchesSearch(game, Search);
+    public bool IsSearchMatch(GameNote game) => GameSearch.Matches(game, Search);
 
-    public static string GetSearchText(GameNote game) =>
-        $"{game.Title}\n{GetPlatform(game)}\n{game.Markdown}";
+    public static string GetSearchText(GameNote game) => GameSearch.GetText(game);
 
     public static string? GetPlatform(GameNote game) =>
         GameNoteMetadata.GetString(game, GameNoteMetadata.PlatformKey);
-
-    private static bool MatchesSearch(GameNote game, string? search)
-    {
-        if (string.IsNullOrWhiteSpace(search))
-        {
-            return true;
-        }
-
-        var term = search.Trim();
-        return game.Title.Contains(term, StringComparison.OrdinalIgnoreCase)
-               || game.Markdown.Contains(term, StringComparison.OrdinalIgnoreCase);
-    }
 
     public async Task<IActionResult> OnPostChangeStatusAsync(
         string id,

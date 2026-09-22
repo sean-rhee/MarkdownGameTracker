@@ -15,11 +15,17 @@
     return;
   }
 
+  // Match .NET invariant casing without expanding one character into several
+  // (for example, JavaScript normally uppercases German sharp s to "SS").
+  const normalizeSearch = value => Array.from(value.trim(), character => {
+    const uppercase = character.toUpperCase();
+    return Array.from(uppercase).length === 1 ? uppercase : character;
+  }).join("");
   const maximumVisibleSuggestions = 7;
   const cards = Array.from(results.querySelectorAll("[data-game-card]"))
     .map((element) => ({
       element,
-      normalizedSearchText: (element.dataset.searchText ?? "").toLocaleLowerCase()
+      normalizedSearchText: (element.dataset.searchText ?? "")
     }));
   const statusLinks = Array.from(document.querySelectorAll(".status-tab"));
   const dependentSearchInputs = Array.from(
@@ -30,7 +36,7 @@
       element,
       index,
       value: element.dataset.searchValue ?? element.textContent.trim(),
-      normalizedValue: (element.dataset.searchValue ?? element.textContent).trim().toLocaleLowerCase()
+      normalizedValue: normalizeSearch(element.dataset.searchValue ?? element.textContent)
     }));
   let visibleSuggestions = [];
   let activeIndex = -1;
@@ -65,7 +71,7 @@
   };
 
   const updateSuggestions = () => {
-    const query = input.value.trim().toLocaleLowerCase();
+    const query = normalizeSearch(input.value);
     if (!query) {
       closeSuggestions();
       return;
@@ -112,7 +118,7 @@
 
   const updateResults = (syncBrowserUrl = true) => {
     const query = input.value.trim();
-    const normalizedQuery = query.toLocaleLowerCase();
+    const normalizedQuery = normalizeSearch(query);
     let visibleCount = 0;
 
     cards.forEach(({ element, normalizedSearchText }) => {

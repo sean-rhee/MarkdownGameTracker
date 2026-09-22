@@ -200,3 +200,112 @@ test('rename conflict keeps the edit form and preserves both files', async () =>
   assert.equal(await page.locator('textarea').inputValue(), 'Unsaved edits');
   assert.deepEqual(await Promise.all(['Browser Old (PC)', 'Browser New (PC)'].map(id => fs.readFile(notePath(id), 'utf8'))), before);
 });
+
+test('platform search agrees across API, server HTML, and browser filtering', async () => {
+  await fs.writeFile(notePath('Platform Match'), '---\ntype: game\nstatus: active\nplatform: PC Café Straße\n---\nJournal');
+  await fs.writeFile(notePath('Other Platform'), '---\ntype: game\nstatus: active\nplatform: Console\n---\nJournal');
+  await page.goto('/');
+  await page.locator('[data-search-suggestions] input').fill(' pc ');
+  assert.equal(await page.locator('[data-game-card]:visible').count(), 1);
+  assert.equal(await page.locator('[data-game-card]:visible h3').innerText(), 'Platform Match');
+  const response = await context.request.get('/api/games?search=pc');
+  assert.deepEqual((await response.json()).map(game => game.id), ['Platform Match']);
+  // Disable JavaScript in a separate context to verify the initial server result too.
+  const noScript = await browser.newContext({ baseURL, javaScriptEnabled: false });
+  try {
+    const serverPage = await noScript.newPage();
+    await serverPage.goto('/?search=pc');
+    assert.equal(await serverPage.locator('[data-game-card]:visible').count(), 1);
+    assert.equal(await serverPage.locator('[data-game-card]:visible h3').innerText(), 'Platform Match');
+  } finally { await noScript.close(); }
+  await page.reload();
+  assert.equal(await page.locator('[data-game-card]:visible').count(), 1);
+  for (const query of ['café', 'straße']) {
+    await page.locator('[data-search-suggestions] input').fill(query);
+    assert.equal(await page.locator('[data-game-card]:visible').count(), 1);
+    const response = await context.request.get(`/api/games?search=${encodeURIComponent(query)}`);
+    assert.deepEqual((await response.json()).map(game => game.id), ['Platform Match']);
+    await page.reload();
+    assert.equal(await page.locator('[data-game-card]:visible').count(), 1);
+  }
+});
+
+const mockIgdb = async title => {
+  const candidates = [
+    { igdbGameId: 101, title, releaseYear: 2020 },
+    { igdbGameId: 202, title: `${title} Remastered`, releaseYear: 2024 }
+  ];
+  await page.route('**/api/games/igdb-title-suggestions?*', route => route.fulfill({ json: { status: 'available', matches: candidates } }));
+  await page.route('**/igdb-matches', route => route.fulfill({ json: { status: 'available', matches: candidates } }));
+  await page.route('**/igdb-description*', route => {
+    const selected = Number(new URL(route.request().url()).searchParams.get('igdbId') || 101);
+    return route.fulfill({ json: {
+      status: 'available', igdbGameId: selected, matchedTitle: selected === 202 ? `${title} Remastered` : title,
+      description: `Description ${selected}`, sourceUrl: 'https://www.igdb.com',
+      artworks: [{ thumbnailUrl: `${baseURL}/fixture/a.png`, fullSizeUrl: `${baseURL}/fixture/a.png` }],
+      screenshots: [{ thumbnailUrl: `${baseURL}/fixture/b.png`, fullSizeUrl: `${baseURL}/fixture/b.png` }],
+      videos: [{ name: 'Trailer', embedUrl: 'https://www.youtube-nocookie.com/embed/abcdefghijk' }]
+    }});
+  });
+  await page.route('**/fixture/*.png', route => route.fulfill({ contentType: 'image/png',
+    body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jJ1sAAAAASUVORK5CYII=', 'base64') }));
+  await page.route('https://www.youtube-nocookie.com/**', route => route.fulfill({ contentType: 'text/html', body: '<html></html>' }));
+};
+
+const selectedMatchFor = id => page.evaluate(id => localStorage.getItem(`game-garden:igdb-match:${id}`), id);
+
+test('selected IGDB match uses the saved filename, survives rename, and renders gallery controls', async () => {
+  const title = 'Browser: Selected/Game';
+  const savedId = 'Browser - Selected Game';
+  await mockIgdb(title);
+  await page.goto('/Games/Create');
+  await page.getByLabel('Game title', { exact: true }).fill(title);
+  await page.getByRole('option', { name: `${title} 2020`, exact: true }).click();
+  await page.getByRole('button', { name: 'Create game note' }).click();
+  await page.waitForURL('**/Games/Details/**');
+  await page.getByText('Description 101', { exact: true }).waitFor();
+  assert.equal(await selectedMatchFor(savedId), '101');
+  assert.equal(await selectedMatchFor(title), null);
+  assert.equal((await readGame(savedId)).frontmatter.igdbId, undefined);
+  assert.equal(await page.locator('[data-game-screenshot-grid] a').count(), 2);
+  assert.equal(await page.locator('[data-game-video-carousel] iframe').count(), 1);
+  await page.locator('[data-view-all-screenshots]').click();
+  const viewer = page.locator('[data-game-screenshot-viewer]');
+  await viewer.waitFor({ state: 'visible' });
+  assert.equal(await page.locator('[data-screenshot-counter]').innerText(), '1 of 2');
+  await page.locator('[data-screenshot-next]').click();
+  assert.equal(await page.locator('[data-screenshot-counter]').innerText(), '2 of 2');
+  await viewer.press('ArrowLeft');
+  assert.equal(await page.locator('[data-screenshot-counter]').innerText(), '1 of 2');
+  await viewer.press('Escape');
+  await viewer.waitFor({ state: 'hidden' });
+  await page.getByRole('button', { name: 'Choose another match' }).click();
+  await page.getByRole('button', { name: `${title} Remastered 2024`, exact: true }).click();
+  await page.getByText('Description 202', { exact: true }).waitFor();
+  assert.equal(await selectedMatchFor(savedId), '202');
+  await page.goto(`/Games/Edit/${encodeURIComponent(savedId)}`);
+  await page.getByLabel('Game title', { exact: true }).fill('Renamed: Game');
+  await page.getByRole('button', { name: 'Save changes' }).click();
+  await page.waitForURL('**/Games/Details/**');
+  await page.getByText('Description 202', { exact: true }).waitFor();
+  assert.equal(await selectedMatchFor('Renamed - Game'), '202');
+  assert.equal(await selectedMatchFor(savedId), null);
+  await page.reload();
+  await page.getByText('Description 202', { exact: true }).waitFor();
+});
+
+test('a rejected create does not change the existing game selection', async () => {
+  const title = 'Existing: Game';
+  const savedId = 'Existing - Game';
+  await seed(savedId);
+  await mockIgdb(title);
+  await page.goto('/Games/Create');
+  await page.evaluate(id => localStorage.setItem(`game-garden:igdb-match:${id}`, '202'), savedId);
+  await page.getByLabel('Game title', { exact: true }).fill(title);
+  await page.getByRole('option', { name: `${title} 2020`, exact: true }).click();
+  await page.getByRole('button', { name: 'Create game note' }).click();
+  await page.getByText(/A game note named .* already exists/).waitFor();
+  assert.equal(await selectedMatchFor(savedId), '202');
+  assert.equal(await selectedMatchFor(title), null);
+  assert.equal((await readGame(savedId)).markdown, 'Keep these notes.');
+});

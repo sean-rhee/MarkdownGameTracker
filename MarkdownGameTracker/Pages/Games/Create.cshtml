@@ -15,6 +15,8 @@
 
 <div class="form-card editor-form-card">
     <form method="post">
+        <input type="hidden" asp-for="SelectedIgdbGameId" data-selected-igdb-id />
+        <input type="hidden" asp-for="SelectedIgdbTitle" data-selected-igdb-title />
         <div asp-validation-summary="ModelOnly" class="validation-summary"></div>
 
         <div class="form-field">

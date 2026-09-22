@@ -22,7 +22,10 @@
   let requestController;
   let suggestions = [];
   let activeIndex = -1;
-  let selectedMatch = null;
+  const selectedIdInput = form.querySelector("[data-selected-igdb-id]");
+  const selectedTitleInput = form.querySelector("[data-selected-igdb-title]");
+  let selectedMatch = selectedIdInput?.value && selectedTitleInput?.value
+    ? { igdbGameId: Number(selectedIdInput.value), title: selectedTitleInput.value } : null;
 
   const announce = (message) => {
     if (status) {
@@ -222,10 +225,9 @@
   });
 
   form.addEventListener("submit", () => {
-    const title = input.value.trim();
-    if (selectedMatch?.title === title) {
-      window.GameGardenIgdbSelection?.set(title, selectedMatch.igdbGameId);
-    }
+    const matchesTitle = selectedMatch?.title === input.value.trim();
+    selectedIdInput.value = matchesTitle ? String(selectedMatch.igdbGameId) : "";
+    selectedTitleInput.value = matchesTitle ? selectedMatch.title : "";
     dismissSuggestions();
   });
 })();

@@ -43,11 +43,6 @@ public sealed class GameMetadataService(IGameRepository repository) : IGameMetad
         decimal rating,
         CancellationToken cancellationToken)
     {
-        if (rating is < 0 or > 10)
-        {
-            throw new ArgumentOutOfRangeException(nameof(rating), "Rating must be between 0 and 10.");
-        }
-
         return repository.UpdateAsync(
             id,
             new UpdateGameRequest(null, null, rating, null, null),
@@ -58,16 +53,7 @@ public sealed class GameMetadataService(IGameRepository repository) : IGameMetad
         string id,
         CancellationToken cancellationToken)
     {
-        // UpdateGameRequest uses null to mean "leave unchanged", so a null
-        // frontmatter value is the repository's explicit delete operation.
         return repository.UpdateAsync(
-            id,
-            new UpdateGameRequest(
-                null,
-                null,
-                null,
-                null,
-                new Dictionary<string, object?> { ["rating"] = null }),
-            cancellationToken);
+            id, new UpdateGameRequest(null, null, null, null, null, ClearRating: true), cancellationToken);
     }
 }

@@ -194,7 +194,7 @@ public sealed class HltbImportService(IGameRepository repository) : IHltbImportS
 
             try
             {
-                baseIds[draft.RowNumber] = MarkdownGameRepository.CreateSafeId(draft.Title);
+                baseIds[draft.RowNumber] = GameNoteFileNames.CreateSafeId(draft.Title);
             }
             catch (ArgumentException exception)
             {
@@ -292,7 +292,7 @@ public sealed class HltbImportService(IGameRepository repository) : IHltbImportS
         {
             var safePlatform = string.IsNullOrWhiteSpace(platform)
                 ? "Unknown platform"
-                : MarkdownGameRepository.CreateSafeId(platform);
+                : GameNoteFileNames.CreateSafeId(platform);
             suffix = ordinal == 1
                 ? $" ({safePlatform})"
                 : $" ({safePlatform}, {ordinal})";
@@ -302,7 +302,7 @@ public sealed class HltbImportService(IGameRepository repository) : IHltbImportS
             suffix = $" ({ordinal})";
         }
 
-        return MarkdownGameRepository.CreateSafeId(title, suffix);
+        return GameNoteFileNames.CreateSafeId(title, suffix);
     }
 
     private static HltbImportEntry ToEntry(

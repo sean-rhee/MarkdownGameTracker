@@ -19,6 +19,9 @@ public sealed class DetailsModel(
 
     public GameNote Game { get; private set; } = null!;
 
+    public string? SelectionSourceId { get; private set; }
+    public string? SelectedIgdbGameId { get; private set; }
+
     public string RenderedMarkdown { get; private set; } = string.Empty;
 
     public IReadOnlyDictionary<string, object?> ExtraFrontmatter => Game.Frontmatter
@@ -37,6 +40,12 @@ public sealed class DetailsModel(
         }
 
         Game = game;
+        if (string.Equals(TempData.Peek("IgdbSelectionTarget") as string, game.Id, StringComparison.Ordinal))
+        {
+            TempData.Remove("IgdbSelectionTarget");
+            SelectionSourceId = TempData["IgdbSelectionSource"] as string;
+            SelectedIgdbGameId = TempData["IgdbSelectedId"] as string;
+        }
         RenderedMarkdown = markdownRenderer.Render(game.Markdown);
         return Page();
     }

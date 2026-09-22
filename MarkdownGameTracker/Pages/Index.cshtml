@@ -9,6 +9,19 @@
     <div class="alert success-alert" role="status">@Model.SuccessMessage</div>
 }
 
+@if (Model.NoteDiagnostics.Count > 0)
+{
+    <div class="alert alert-warning" role="alert">
+        <strong>Some notes could not be loaded.</strong>
+        <ul>
+            @foreach (var diagnostic in Model.NoteDiagnostics)
+            {
+                <li><strong>@diagnostic.FileName</strong>: @diagnostic.Message</li>
+            }
+        </ul>
+    </div>
+}
+
 <section class="hero-panel">
     <div class="journal-intro">
         <span class="eyebrow">Your personal game journal</span>
@@ -55,7 +68,7 @@
             <div class="search-combobox" data-search-suggestions>
                 <input asp-for="Search"
                        class="form-control"
-                       placeholder="Title or notes…"
+                       placeholder="Title, platform, or notes…"
                        autocomplete="off"
                        role="combobox"
                        aria-autocomplete="list"

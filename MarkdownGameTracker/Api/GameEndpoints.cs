@@ -14,8 +14,13 @@ public static class GameEndpoints
         games.MapGet("/", ListGamesAsync)
             .WithName("ListGames")
             .WithSummary("List game notes")
-            .WithDescription("Lists game notes, optionally filtered by status or searched by title and Markdown content.")
+            .WithDescription("Lists game notes, optionally filtered by status or searched by title, platform, and Markdown content.")
             .Produces<IReadOnlyList<GameNote>>(StatusCodes.Status200OK);
+        games.MapGet("/scan", (string? status, string? search, IGameRepository repository,
+                CancellationToken cancellationToken) => repository.ScanAsync(status, search, cancellationToken))
+            .WithName("ScanGameLibrary")
+            .WithSummary("List readable games and note diagnostics")
+            .Produces<GameLibraryScan>();
         games.MapGet("/{id}", GetGameAsync)
             .WithName("GetGame")
             .WithSummary("Get a game note")
@@ -54,7 +59,7 @@ public static class GameEndpoints
     private static async Task<IResult> ListGamesAsync(
         [Description("Exact status to match: active, endless, completed, inactive, or planned.")]
         string? status,
-        [Description("Case-insensitive text to find in a game title or Markdown body.")]
+        [Description("Case-insensitive text to find in a game title, platform, or Markdown body.")]
         string? search,
         IGameRepository repository,
         CancellationToken cancellationToken)
@@ -76,6 +81,10 @@ public static class GameEndpoints
                 ? Problem(StatusCodes.Status404NotFound, "Game not found", $"No game note named '{id}' exists.")
                 : Results.Ok(game);
         }
+        catch (InvalidDataException exception)
+        {
+            return Problem(StatusCodes.Status422UnprocessableEntity, "Unreadable game note", exception.Message);
+        }
         catch (ArgumentException exception)
         {
             return InvalidRequest(exception);
@@ -95,6 +104,10 @@ public static class GameEndpoints
         catch (GameAlreadyExistsException exception)
         {
             return Problem(StatusCodes.Status409Conflict, "Game already exists", exception.Message);
+        }
+        catch (InvalidDataException exception)
+        {
+            return Problem(StatusCodes.Status422UnprocessableEntity, "Unreadable game note", exception.Message);
         }
         catch (ArgumentException exception)
         {
@@ -120,6 +133,10 @@ public static class GameEndpoints
         {
             return Problem(StatusCodes.Status409Conflict, "Game already exists", exception.Message);
         }
+        catch (InvalidDataException exception)
+        {
+            return Problem(StatusCodes.Status422UnprocessableEntity, "Unreadable game note", exception.Message);
+        }
         catch (ArgumentException exception)
         {
             return InvalidRequest(exception);
@@ -137,6 +154,10 @@ public static class GameEndpoints
             return await repository.DeleteAsync(id, cancellationToken)
                 ? Results.NoContent()
                 : Problem(StatusCodes.Status404NotFound, "Game not found", $"No game note named '{id}' exists.");
+        }
+        catch (InvalidDataException exception)
+        {
+            return Problem(StatusCodes.Status422UnprocessableEntity, "Unreadable game note", exception.Message);
         }
         catch (ArgumentException exception)
         {

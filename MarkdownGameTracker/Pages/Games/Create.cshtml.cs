@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using MarkdownGameTracker.Models;
 using MarkdownGameTracker.Storage;
 using Microsoft.AspNetCore.Mvc;
@@ -9,6 +10,12 @@ public sealed class CreateModel(IGameRepository repository) : PageModel
 {
     [BindProperty]
     public GameFormInput Input { get; set; } = new();
+
+    [BindProperty, Range(typeof(long), "1", "9223372036854775807")]
+    public long? SelectedIgdbGameId { get; set; }
+
+    [BindProperty, StringLength(200)]
+    public string? SelectedIgdbTitle { get; set; }
 
     public void OnGet()
     {
@@ -34,6 +41,11 @@ public sealed class CreateModel(IGameRepository repository) : PageModel
                     Input.ToFrontmatter()),
                 cancellationToken);
 
+            if (SelectedIgdbGameId is > 0 && string.Equals(SelectedIgdbTitle, game.Title, StringComparison.Ordinal))
+            {
+                TempData["IgdbSelectionTarget"] = game.Id;
+                TempData["IgdbSelectedId"] = SelectedIgdbGameId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            }
             TempData["SuccessMessage"] = $"Added {game.Title} to your game garden.";
             return RedirectToPage("/Games/Details", new { id = game.Id });
         }

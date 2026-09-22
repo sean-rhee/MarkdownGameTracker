@@ -7,7 +7,7 @@ An ASP.NET Core backend that treats the Markdown game notes in an Obsidian vault
 The root page at [`http://localhost:5297/`](http://localhost:5297/) is a responsive Razor Pages dashboard with a pastel-blue theme. It provides:
 
 - Five status tabs with counts for Active, Endless, Completed, Inactive, and Plan to play
-- Search scoped to the selected status tab
+- Search across titles, platforms, and notes, scoped to the selected status tab
 - Library sorting by title (A–Z or Z–A), recently updated, or highest rated; remembered in your browser. Recently updated uses the note file's modification time, and unrated games appear last when sorting by rating.
 - Game cards with status, rating, platform, and note excerpts
 - Clickable status badges for moving a game between statuses directly from its card
@@ -30,7 +30,8 @@ In development, interactive Swagger documentation is available at [`/swagger`](h
 
 | Method | Route | Purpose |
 | --- | --- | --- |
-| `GET` | `/api/games?status=active&search=term` | List, filter, and search games |
+| `GET` | `/api/games?status=active&search=term` | List, filter, and search readable games |
+| `GET` | `/api/games/scan?status=active&search=term` | Return readable games together with per-file diagnostics |
 | `GET` | `/api/games/{id}` | Read one game by filename without `.md` |
 | `GET` | `/api/games/{id}/igdb-description` | Fetch a read-only game description from IGDB |
 | `GET` | `/api/games/{id}/igdb-matches` | Find likely IGDB titles and release years |
@@ -39,7 +40,7 @@ In development, interactive Swagger documentation is available at [`/swagger`](h
 | `DELETE` | `/api/games/{id}` | Permanently delete a game note |
 | `POST` | `/api/markdown/preview` | Render safe HTML for the live Markdown preview |
 
-Only top-level Markdown files whose frontmatter contains `type: game` are exposed. This prevents the API from treating `Games/Games.md`, which is an index note, as a game. All paths are confined to the configured games directory.
+Only top-level Markdown files whose frontmatter contains `type: game` are exposed. This prevents the API from treating `Games/Games.md`, which is an index note, as a game. All paths are confined to the configured games directory. A malformed or unreadable note does not prevent the remaining library from loading. The homepage identifies skipped files; the scan endpoint returns `{ "games": [...], "diagnostics": [...] }`, with filenames and messages. Malformed notes cannot be overwritten or deleted through the app; repair them in Obsidian first.
 
 Ratings are optional numbers from 0 through 10. Every new game uses one of five canonical status values: `active`, `endless`, `completed`, `inactive`, or `planned`. Use `endless` for ongoing games without a meaningful completion point, while `active` is for games whose progress or ending you are tracking. The UI displays `planned` as **Plan to play**. Legacy values such as `plan to play`, `planning`, and `backlog` are read as `planned`.
 
@@ -75,7 +76,7 @@ $env:IGDB__ClientId = "your-client-id"
 $env:IGDB__ClientSecret = "your-client-secret"
 ```
 
-Opening a game's details page then loads its IGDB description, cover, wide artwork, complete image gallery, and listed YouTube videos asynchronously. If the automatic match is wrong, **Choose another match** reveals up to ten likely titles with their release years and cover thumbnails. A manual selection is remembered in that browser's local storage, while results are cached in server memory. Neither the description, media URLs, nor any IGDB identifier is added to the Markdown file. Without credentials, the rest of the details page continues to work and shows a setup message in the description panel.
+Opening a game's details page then loads its IGDB description, cover, wide artwork, complete image gallery, and listed YouTube videos asynchronously. If the automatic match is wrong, **Choose another match** reveals up to ten likely titles with their release years and cover thumbnails. A manual selection is remembered in that browser's local storage under the actual saved note ID, including when a title needs filename sanitization. Successful renames through the edit form transfer that selection; failed submissions leave it unchanged. Results are cached in server memory. Incomplete lookups use a short retry cache and are not treated as confirmed misses. Neither the description, media URLs, nor any IGDB identifier is added to the Markdown file. Without credentials, the rest of the details page continues to work and shows a setup message in the description panel.
 
 ### HowLongToBeat imports
 
@@ -143,7 +144,7 @@ Create a note:
 }
 ```
 
-Updates are merge-based: omitted values preserve the existing note, changing `title` renames the file, and extra frontmatter fields are retained. To remove a frontmatter field, send that key with a `null` value inside `frontmatter`.
+Updates are merge-based: omitted values preserve the existing note, changing `title` renames the file, and extra frontmatter fields are retained. To remove a frontmatter field, send that key with a `null` value inside `frontmatter`. Ratings have three explicit update behaviors: an omitted or null `rating` leaves it unchanged, a numeric `rating` sets it, and `"clearRating": true` removes it. The legacy `"frontmatter": { "rating": null }` format still clears a rating. Ratings supplied through frontmatter receive the same numeric and range validation, including during creation. Setting and clearing a rating in one request is rejected; when both typed and frontmatter ratings are supplied, both are validated and the typed value takes precedence. The `type`, `title`, and `status` fields are controlled by the typed request rather than raw frontmatter.
 
 New notes automatically receive the vault's existing defaults:
 
@@ -153,6 +154,8 @@ hobby:
   - "[[Gaming]]"
 title: Hades II
 ```
+
+New filenames use the same Windows-compatible rules on every host. Case-only renames preserve one note with the requested filename spelling. Existing Linux notes with older punctuation in their filenames remain readable.
 
 Writes use a temporary file in the same directory before replacing the destination, reducing the chance of leaving a partially written note. Rewriting a note preserves frontmatter values and Markdown content, but YAML whitespace, quoting, and comments may be normalized.
 
@@ -177,7 +180,7 @@ npx playwright install chromium
 npm test
 ```
 
-The browser suite builds the application, starts its own local server on an available port, and creates a temporary vault. It exercises editor formatting and previews, preview failure recovery, saving and clearing notes, rating and status menus, keyboard search, rename conflicts, and delete confirmation. Each scenario gets fresh browser storage and game files; the server and temporary vault are removed afterward. IGDB credentials are disabled for these tests.
+The browser suite builds the application, starts its own local server on an available port, and creates a temporary vault. It exercises editor formatting and previews, preview failure recovery, saving and clearing notes, rating and status menus, keyboard search, rename conflicts, and delete confirmation. Each scenario gets fresh browser storage and game files; the server and temporary vault are removed afterward. IGDB credentials are disabled for these tests; selection and gallery scenarios use mocked responses. Search checks compare the API, initial server HTML, and interactive filtering.
 
 To use an installed Microsoft Edge instead of downloading Chromium, set `$env:BROWSER_CHANNEL = "msedge"` before `npm test` and omit the browser installation step. Run the browser suite after `dotnet test` finishes, since both use the application's build output.
 

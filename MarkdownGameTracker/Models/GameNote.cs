@@ -24,4 +24,5 @@ public sealed record UpdateGameRequest(
     string? Status,
     [property: Range(typeof(decimal), "0", "10")] decimal? Rating,
     string? Markdown,
-    Dictionary<string, object?>? Frontmatter);
+    Dictionary<string, object?>? Frontmatter,
+    bool ClearRating = false);

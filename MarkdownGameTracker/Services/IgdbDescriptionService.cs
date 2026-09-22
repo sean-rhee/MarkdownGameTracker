@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
+using static MarkdownGameTracker.Services.IgdbGameMapper;
 
 namespace MarkdownGameTracker.Services;
 
@@ -24,6 +25,7 @@ internal sealed class IgdbDescriptionService(
     IOptions<IgdbOptions> options,
     IMemoryCache cache) : IIgdbDescriptionService
 {
+    private const string ArtworkFields = "id,name,cover.image_id,artworks.image_id,artworks.width,artworks.height";
     private const string DescriptionFields =
         "id,name,summary,storyline,slug,url,first_release_date,"
         + "cover.image_id,artworks.image_id,artworks.width,artworks.height,"
@@ -32,6 +34,7 @@ internal sealed class IgdbDescriptionService(
     private static readonly TimeSpan MetadataCacheDuration = TimeSpan.FromHours(24);
     private static readonly TimeSpan FailureCacheDuration = TimeSpan.FromMinutes(5);
     private readonly IgdbOptions _options = options.Value;
+    private readonly IgdbGameMatching _matching = new(apiClient);
 
     public async Task<IgdbDescriptionResult> GetDescriptionAsync(
         string title,
@@ -53,11 +56,14 @@ internal sealed class IgdbDescriptionService(
             return cachedResult;
         }
 
-        var result = await LookupDescriptionAsync(normalizedTitle, igdbGameId, cancellationToken);
+        var outcome = await LookupDescriptionAsync(normalizedTitle, igdbGameId, cancellationToken);
+        var result = outcome.Games.Length > 0 || outcome.IsConfirmedMiss
+            ? ToDescriptionResult(outcome.Games.FirstOrDefault())
+            : IgdbDescriptionResult.Unavailable();
         cache.Set(
             cacheKey,
             result,
-            IsStableStatus(result.Status) ? MetadataCacheDuration : FailureCacheDuration);
+            outcome.IsComplete && IsStableStatus(result.Status) ? MetadataCacheDuration : FailureCacheDuration);
         return result;
     }
 
@@ -79,27 +85,16 @@ internal sealed class IgdbDescriptionService(
         }
 
         const string matchFields = "id,name,first_release_date,slug,url,cover.image_id";
-        var exactQuery = $"fields {matchFields}; "
-                         + $"where name = \"{EscapeSearchText(normalizedTitle)}\"; limit 10;";
-        var searchQuery = $"search \"{EscapeSearchText(normalizedTitle)}\"; "
-                          + $"fields {matchFields}; where version_parent = null; limit 25;";
-        var exactResult = await apiClient.QueryGamesAsync(normalizedTitle, exactQuery, cancellationToken);
-        var searchResult = await apiClient.QueryGamesAsync(normalizedTitle, searchQuery, cancellationToken);
-        var candidates = exactResult.Games
-            .Where(game => string.Equals(game.Name, normalizedTitle, StringComparison.OrdinalIgnoreCase))
-            .Concat(searchResult.Games)
-            .DistinctBy(game => game.Id)
-            .ToArray();
-        var result = !exactResult.Succeeded && !searchResult.Succeeded
-            ? IgdbMatchSearchResult.Unavailable()
-            : candidates.Length == 0
-                ? IgdbMatchSearchResult.NotFound()
-                : IgdbMatchSearchResult.Available(candidates.Select(ToMatch).ToArray());
+        var outcome = await _matching.FindAsync(normalizedTitle, matchFields, cancellationToken,
+            includeAlternatives: true);
+        var result = outcome.Games.Length > 0
+            ? IgdbMatchSearchResult.Available(outcome.Games.Select(ToMatch).ToArray())
+            : outcome.IsConfirmedMiss ? IgdbMatchSearchResult.NotFound() : IgdbMatchSearchResult.Unavailable();
 
         cache.Set(
             cacheKey,
             result,
-            IsStableStatus(result.Status) ? MetadataCacheDuration : FailureCacheDuration);
+            outcome.IsComplete && IsStableStatus(result.Status) ? MetadataCacheDuration : FailureCacheDuration);
         return result;
     }
 
@@ -165,8 +160,7 @@ internal sealed class IgdbDescriptionService(
                 Environment.NewLine,
                 batch.Select((game, index) =>
                     $"query games \"game{index}\" {{ "
-                    + "fields id,name,cover.image_id,artworks.image_id,artworks.width,artworks.height; "
-                    + $"where name = \"{EscapeSearchText(game.Title.Trim())}\"; limit 10; }};"));
+                    + IgdbGameMatching.ExactQuery(game.Title, ArtworkFields) + " };"));
             var batchResult = await apiClient.QueryMultipleGamesAsync(query, cancellationToken);
             allQueriesSucceeded &= batchResult.Succeeded;
             if (!batchResult.Succeeded)
@@ -179,29 +173,13 @@ internal sealed class IgdbDescriptionService(
             {
                 var requested = batch[index];
                 resultsByName.TryGetValue($"game{index}", out var matches);
-                var match = matches?.Result.FirstOrDefault(game =>
-                                string.Equals(game.Name, requested.Title.Trim(), StringComparison.OrdinalIgnoreCase));
-                if (match is null)
+                var outcome = await _matching.FindAsync(requested.Title, ArtworkFields, cancellationToken,
+                    exactResult: matches is null ? IgdbQueryResult.Failed() : IgdbQueryResult.Success(matches.Result));
+                allQueriesSucceeded &= outcome.IsComplete;
+                if (outcome.Games.Length > 0 || outcome.IsConfirmedMiss)
                 {
-                    // Match the details page's search fallback when punctuation or edition
-                    // names differ from IGDB. Do not cache a transient search failure as a miss.
-                    var title = requested.Title.Trim();
-                    var searchQuery = $"search \"{EscapeSearchText(title)}\"; "
-                                      + "fields id,name,cover.image_id,artworks.image_id,artworks.width,artworks.height; "
-                                      + "where version_parent = null; limit 25;";
-                    var searchResult = await apiClient.QueryGamesAsync(title, searchQuery, cancellationToken);
-                    allQueriesSucceeded &= searchResult.Succeeded;
-                    if (!searchResult.Succeeded)
-                    {
-                        continue;
-                    }
-
-                    match = searchResult.Games.FirstOrDefault(game =>
-                                string.Equals(game.Name, title, StringComparison.OrdinalIgnoreCase))
-                            ?? searchResult.Games.FirstOrDefault();
+                    CacheArtwork(requested, outcome.Games.FirstOrDefault(), artwork, outcome.IsComplete);
                 }
-
-                CacheArtwork(requested, match, artwork);
             }
         }
 
@@ -210,119 +188,16 @@ internal sealed class IgdbDescriptionService(
             : IgdbCardArtworkResult.Available(artwork);
     }
 
-    private async Task<IgdbDescriptionResult> LookupDescriptionAsync(
-        string title,
-        long? igdbGameId,
-        CancellationToken cancellationToken)
+    private async Task<IgdbMatchOutcome> LookupDescriptionAsync(
+        string title, long? igdbGameId, CancellationToken cancellationToken)
     {
-        if (igdbGameId is not null)
-        {
-            var selectedQuery = $"fields {DescriptionFields}; "
-                                + $"where id = {igdbGameId.Value}; limit 1;";
-            var selectedResult = await apiClient.QueryGamesAsync(title, selectedQuery, cancellationToken);
-            return !selectedResult.Succeeded
-                ? IgdbDescriptionResult.Unavailable()
-                : ToDescriptionResult(selectedResult.Games.FirstOrDefault());
-        }
+        if (igdbGameId is null)
+            return await _matching.FindAsync(title, DescriptionFields, cancellationToken);
 
-        var exactQuery = $"fields {DescriptionFields}; "
-                         + $"where name = \"{EscapeSearchText(title)}\"; limit 10;";
-        var exactResult = await apiClient.QueryGamesAsync(title, exactQuery, cancellationToken);
-        var match = exactResult.Games.FirstOrDefault(game =>
-            string.Equals(game.Name, title, StringComparison.OrdinalIgnoreCase));
-        if (match is not null)
-        {
-            return ToDescriptionResult(match);
-        }
-
-        var searchQuery = $"search \"{EscapeSearchText(title)}\"; "
-                          + $"fields {DescriptionFields}; where version_parent = null; limit 25;";
-        var searchResult = await apiClient.QueryGamesAsync(title, searchQuery, cancellationToken);
-        if (!exactResult.Succeeded && !searchResult.Succeeded)
-        {
-            return IgdbDescriptionResult.Unavailable();
-        }
-
-        match = searchResult.Games.FirstOrDefault(game =>
-                    string.Equals(game.Name, title, StringComparison.OrdinalIgnoreCase))
-                ?? searchResult.Games.FirstOrDefault();
-        return ToDescriptionResult(match);
+        var result = await apiClient.QueryGamesAsync(title,
+            $"fields {DescriptionFields}; where id = {igdbGameId.Value}; limit 1;", cancellationToken);
+        return new(result.Games, result.Succeeded);
     }
-
-    private static IgdbDescriptionResult ToDescriptionResult(IgdbGame? match)
-    {
-        if (match is null)
-        {
-            return IgdbDescriptionResult.NotFound();
-        }
-
-        var description = !string.IsNullOrWhiteSpace(match.Summary)
-            ? match.Summary
-            : match.Storyline;
-        var coverUrl = BuildImageUrl(match.Cover?.ImageId, "cover_big_2x");
-        var heroImage = match.Artworks?
-                            .Where(image => image.Width > image.Height)
-                            .OrderByDescending(image => (long)image.Width.GetValueOrDefault()
-                                                        * image.Height.GetValueOrDefault())
-                            .FirstOrDefault()
-                        ?? match.Screenshots?.FirstOrDefault()
-                        ?? match.Artworks?.FirstOrDefault();
-        var heroUrl = BuildImageUrl(heroImage?.ImageId, "1080p");
-        var artworks = ToMediaImages(match.Artworks);
-        var screenshots = (match.Screenshots ?? [])
-            .Where(image => !string.IsNullOrWhiteSpace(image.ImageId))
-            .DistinctBy(image => image.ImageId, StringComparer.Ordinal)
-            .Select(ToMediaImage)
-            .ToArray();
-        var videos = (match.Videos ?? [])
-            .Where(item => IsValidYouTubeVideoId(item.VideoId))
-            .DistinctBy(item => item.VideoId, StringComparer.Ordinal)
-            .Select(item => new IgdbVideo(
-                string.IsNullOrWhiteSpace(item.Name) ? "Game video" : item.Name.Trim(),
-                $"https://www.youtube-nocookie.com/embed/{item.VideoId}"))
-            .ToArray();
-        if (string.IsNullOrWhiteSpace(description)
-            && coverUrl is null
-            && heroUrl is null
-            && artworks.Length == 0
-            && screenshots.Length == 0
-            && videos.Length == 0)
-        {
-            return IgdbDescriptionResult.NotFound();
-        }
-
-        return IgdbDescriptionResult.Available(
-            match.Id,
-            description?.Trim(),
-            match.Name,
-            GetSourceUrl(match),
-            coverUrl,
-            heroUrl,
-            artworks,
-            screenshots,
-            videos);
-    }
-
-    private static IgdbScreenshot[] ToMediaImages(IgdbImage[]? images) =>
-        (images ?? [])
-            .Where(image => !string.IsNullOrWhiteSpace(image.ImageId))
-            .DistinctBy(image => image.ImageId, StringComparer.Ordinal)
-            .Select(ToMediaImage)
-            .ToArray();
-
-    private static IgdbScreenshot ToMediaImage(IgdbImage image) =>
-        new(
-            BuildImageUrl(image.ImageId, "screenshot_med_2x")!,
-            BuildImageUrl(image.ImageId, "1080p")!);
-
-    private static bool IsValidYouTubeVideoId(string? videoId) =>
-        videoId is { Length: 11 }
-        && videoId.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_');
-
-    private static string EscapeSearchText(string value) =>
-        value
-            .Replace("\\", "\\\\", StringComparison.Ordinal)
-            .Replace("\"", "\\\"", StringComparison.Ordinal);
 
     private static bool IsStableStatus(string status) =>
         status is IgdbDescriptionResult.AvailableStatus or IgdbDescriptionResult.NotFoundStatus;
@@ -335,81 +210,17 @@ internal sealed class IgdbDescriptionService(
     private void CacheArtwork(
         IgdbArtworkLookup requested,
         IgdbGame? match,
-        ICollection<IgdbCardArtwork> results)
+        ICollection<IgdbCardArtwork> results, bool isComplete = true)
     {
         var selectedArtwork = match is null ? null : ToCardArtwork(requested.GameId, match);
         cache.Set(
             GetArtworkCacheKey(requested),
             new IgdbArtworkCacheEntry(selectedArtwork),
-            MetadataCacheDuration);
+            isComplete ? MetadataCacheDuration : FailureCacheDuration);
         if (selectedArtwork is not null)
         {
             results.Add(selectedArtwork);
         }
-    }
-
-    private static IgdbCardArtwork? ToCardArtwork(string gameId, IgdbGame game)
-    {
-        var landscape = game.Artworks?
-            .Where(image => image.Width > image.Height)
-            .OrderByDescending(image => (long)image.Width.GetValueOrDefault()
-                                        * image.Height.GetValueOrDefault())
-            .FirstOrDefault();
-        var artworkUrl = BuildImageUrl(landscape?.ImageId, "720p");
-        if (artworkUrl is not null)
-        {
-            return new IgdbCardArtwork(gameId, game.Id, game.Name, artworkUrl, "artwork");
-        }
-
-        var coverUrl = BuildImageUrl(game.Cover?.ImageId, "cover_big_2x");
-        return coverUrl is null
-            ? null
-            : new IgdbCardArtwork(gameId, game.Id, game.Name, coverUrl, "cover");
-    }
-
-    private static IgdbGameMatch ToMatch(IgdbGame game) =>
-        new(
-            game.Id,
-            game.Name,
-            GetReleaseYear(game.FirstReleaseDate),
-            GetSourceUrl(game),
-            BuildImageUrl(game.Cover?.ImageId, "cover_small_2x"));
-
-    private static string? BuildImageUrl(string? imageId, string size) =>
-        string.IsNullOrWhiteSpace(imageId)
-            ? null
-            : $"https://images.igdb.com/igdb/image/upload/t_{size}/{Uri.EscapeDataString(imageId)}.jpg";
-
-    private static int? GetReleaseYear(long? timestamp)
-    {
-        if (timestamp is null)
-        {
-            return null;
-        }
-
-        try
-        {
-            return DateTimeOffset.FromUnixTimeSeconds(timestamp.Value).Year;
-        }
-        catch (ArgumentOutOfRangeException)
-        {
-            return null;
-        }
-    }
-
-    private static string GetSourceUrl(IgdbGame game)
-    {
-        if (Uri.TryCreate(game.Url, UriKind.Absolute, out var sourceUri)
-            && sourceUri.Scheme == Uri.UriSchemeHttps
-            && (sourceUri.Host.Equals("igdb.com", StringComparison.OrdinalIgnoreCase)
-                || sourceUri.Host.EndsWith(".igdb.com", StringComparison.OrdinalIgnoreCase)))
-        {
-            return sourceUri.ToString();
-        }
-
-        return !string.IsNullOrWhiteSpace(game.Slug)
-            ? $"https://www.igdb.com/games/{Uri.EscapeDataString(game.Slug)}"
-            : "https://www.igdb.com";
     }
 
     private sealed record IgdbArtworkCacheEntry(IgdbCardArtwork? Artwork);

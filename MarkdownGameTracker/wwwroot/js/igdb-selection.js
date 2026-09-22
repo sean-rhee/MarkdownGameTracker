@@ -29,5 +29,17 @@
     }
   };
 
+  // Only successful form redirects emit a transfer, using the actual saved ID.
+  const transfer = document.querySelector("[data-igdb-selection-transfer]");
+  if (transfer) {
+    const { targetId, sourceId, selectedId } = transfer.dataset;
+    const explicitId = Number(selectedId);
+    const igdbId = Number.isSafeInteger(explicitId) && explicitId > 0 ? explicitId : sourceId ? get(sourceId) : null;
+    if (targetId && igdbId) {
+      set(targetId, igdbId);
+      if (sourceId && sourceId !== targetId && get(targetId) === igdbId) clear(sourceId);
+    }
+  }
+
   window.GameGardenIgdbSelection = Object.freeze({ get, set, clear });
 })();

@@ -336,6 +336,30 @@ public sealed class IgdbTests
         Assert.NotEqual(rejectedToken.Generation, refreshedTokens[0].Generation);
     }
 
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public async Task Empty_incomplete_lookups_are_unavailable_not_confirmed_misses(bool exactFails, bool searchFails)
+    {
+        using var handler = new FakeIgdbHttpHandler
+        {
+            GameResponse = query => new HttpResponseMessage(
+                (query.Contains("where name =", StringComparison.Ordinal) ? exactFails : searchFails)
+                    ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.OK)
+            {
+                Content = new StringContent("[]", Encoding.UTF8, "application/json")
+            }
+        };
+        using var client = new HttpClient(handler);
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var service = CreateService(client, cache);
+        var expected = exactFails || searchFails ? "unavailable" : "notFound";
+        Assert.Equal(expected, (await service.GetDescriptionAsync("Missing", null, CancellationToken.None)).Status);
+        Assert.Equal(expected, (await service.SearchMatchesAsync("Missing", CancellationToken.None)).Status);
+    }
+
     private static IgdbDescriptionService CreateService(HttpClient client, IMemoryCache cache)
     {
         var options = CreateIgdbOptions();

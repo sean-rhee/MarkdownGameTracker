@@ -1,5 +1,10 @@
 @page "{id}"
 @model MarkdownGameTracker.Pages.Games.DetailsModel
+@if (Model.SelectionSourceId is not null || Model.SelectedIgdbGameId is not null)
+{
+    <span hidden data-igdb-selection-transfer data-target-id="@Model.Game.Id"
+          data-source-id="@Model.SelectionSourceId" data-selected-id="@Model.SelectedIgdbGameId"></span>
+}
 @{
     ViewData["Title"] = Model.Game.Title;
 }
@@ -236,5 +241,8 @@
 </div>
 
 @section Scripts {
+    <script src="~/js/igdb-client.js" asp-append-version="true"></script>
+    <script src="~/js/game-media.js" asp-append-version="true"></script>
+    <script src="~/js/igdb-match-picker.js" asp-append-version="true"></script>
     <script src="~/js/game-description.js" asp-append-version="true"></script>
 }
