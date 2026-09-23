@@ -24,6 +24,18 @@ public sealed class DetailsModel(
 
     public string RenderedMarkdown { get; private set; } = string.Empty;
 
+    public string RenderedProgressJournal { get; private set; } = string.Empty;
+
+    public ProgressJournalSection ProgressJournal { get; private set; } = null!;
+
+    [BindProperty]
+    public string? JournalDraft { get; set; }
+
+    [BindProperty]
+    public string? JournalVersion { get; set; }
+
+    public string? JournalError { get; private set; }
+
     public IReadOnlyDictionary<string, object?> ExtraFrontmatter => Game.Frontmatter
         .Where(pair => !PrimaryFields.Contains(pair.Key))
         .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
@@ -39,15 +51,70 @@ public sealed class DetailsModel(
             return NotFound();
         }
 
-        Game = game;
+        LoadGame(game);
         if (string.Equals(TempData.Peek("IgdbSelectionTarget") as string, game.Id, StringComparison.Ordinal))
         {
             TempData.Remove("IgdbSelectionTarget");
             SelectionSourceId = TempData["IgdbSelectionSource"] as string;
             SelectedIgdbGameId = TempData["IgdbSelectedId"] as string;
         }
-        RenderedMarkdown = markdownRenderer.Render(game.Markdown);
         return Page();
+    }
+
+    public async Task<IActionResult> OnPostSaveProgressAsync(string id, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(JournalVersion))
+        {
+            return BadRequest();
+        }
+
+        var game = await repository.GetAsync(id, cancellationToken);
+        if (game is null)
+        {
+            return NotFound();
+        }
+
+        if (ProgressJournalDocument.ContainsAnotherMajorHeading(JournalDraft ?? string.Empty))
+        {
+            LoadGame(game);
+            JournalError = "Use ### for headings inside the journal. Edit the full note to add another main section.";
+            return Page();
+        }
+
+        var update = await repository.UpdateProgressJournalAsync(
+            id, JournalVersion, JournalDraft ?? string.Empty, cancellationToken);
+        if (update.Game is null)
+        {
+            return NotFound();
+        }
+
+        if (update.Error is not null)
+        {
+            LoadGame(update.Game);
+            JournalError = update.Error;
+            return Page();
+        }
+
+        if (update.Conflict)
+        {
+            LoadGame(update.Game);
+            JournalVersion = ProgressJournal.Version;
+            ModelState.Remove(nameof(JournalVersion));
+            JournalError = "The journal changed while you were editing. Your draft is still here. Compare it with the current journal below, then save again if you want to replace it.";
+            return Page();
+        }
+
+        TempData["SuccessMessage"] = "Progress journal saved.";
+        return RedirectToPage("/Games/Details", null, new { id = update.Game.Id }, "progress-journal");
+    }
+
+    private void LoadGame(GameNote game)
+    {
+        Game = game;
+        ProgressJournal = ProgressJournalDocument.Read(game.Markdown);
+        (RenderedProgressJournal, RenderedMarkdown) = markdownRenderer.RenderSections(game.Markdown, ProgressJournal);
+        JournalDraft ??= ProgressJournal.Content;
+        JournalVersion ??= ProgressJournal.Version;
     }
 
     public async Task<IActionResult> OnPostDeleteAsync(string id, CancellationToken cancellationToken)

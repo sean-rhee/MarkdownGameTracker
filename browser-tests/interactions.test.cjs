@@ -309,3 +309,42 @@ test('a rejected create does not change the existing game selection', async () =
   assert.equal(await selectedMatchFor(title), null);
   assert.equal((await readGame(savedId)).markdown, 'Keep these notes.');
 });
+
+test('progress journal edits in place and preserves a review through conflicts', async () => {
+  const id = 'Browser Progress';
+  await fs.writeFile(notePath(id),
+    '---\ntype: game\nstatus: active\ncustom: keep\n---\n## Progress Journal\nFirst session.\n\n## Review\nA detailed review.\n');
+  await page.goto(`/Games/Details/${encodeURIComponent(id)}`);
+  assert.match(await page.locator('.progress-journal-body').innerText(), /First session/);
+  assert.match(await page.locator('.note-card .markdown-body').innerText(), /A detailed review/);
+  assert.doesNotMatch(await page.locator('.note-card .markdown-body').innerText(), /First session/);
+  const editor = page.locator('textarea[name="JournalDraft"]');
+  await page.getByText('Update progress', { exact: true }).click();
+  await page.waitForFunction(() => document.activeElement?.getAttribute('name') === 'JournalDraft');
+  assert.equal(await editor.inputValue(), 'First session.');
+  await editor.fill('Second session.\n### Next objective\nFind the key.');
+  await page.getByRole('button', { name: 'Save progress' }).click();
+  await page.getByText('Progress journal saved.').waitFor();
+  assert.match(await page.locator('.progress-journal-body').innerText(), /Second session/);
+  let markdown = (await readGame(id)).markdown;
+  assert.match(markdown, /## Progress Journal\nSecond session/);
+  assert.match(markdown, /## Review\nA detailed review/);
+
+  await page.getByText('Update progress', { exact: true }).click();
+  await editor.fill('My draft after the third session.');
+  const before = await fs.readFile(notePath(id), 'utf8');
+  await fs.writeFile(notePath(id), before.replace('Second session.', 'Changed from Obsidian.'));
+  await page.getByRole('button', { name: 'Save progress' }).click();
+  await page.getByText(/journal changed while you were editing/).waitFor();
+  assert.equal(await editor.inputValue(), 'My draft after the third session.');
+  assert.match(await page.locator('.progress-journal-body').innerText(), /Changed from Obsidian/);
+  assert.doesNotMatch(await fs.readFile(notePath(id), 'utf8'), /My draft after/);
+  await page.getByRole('button', { name: 'Save progress' }).click();
+  await page.getByText('Progress journal saved.').waitFor();
+  markdown = (await readGame(id)).markdown;
+  assert.match(markdown, /My draft after the third session/);
+  assert.match(markdown, /## Review\nA detailed review/);
+  assert.match(await fs.readFile(notePath(id), 'utf8'), /custom: keep/);
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+});

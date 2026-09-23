@@ -16,6 +16,7 @@ The root page at [`http://localhost:5297/`](http://localhost:5297/) is a respons
 - An IGDB-powered game description on each details page, with a match picker for similarly named games
 - IGDB cover art, wide artwork, all screenshots and artwork, and all listed videos for the selected game match
 - Formatted Markdown viewing with headings, lists, tables, task lists, links, quotes, and code blocks
+- A Progress Journal card on each game page. It shows the `## Progress Journal` section near the tracker fields and opens an editor for that section in place. If the heading is missing, the card can create it. Reviews and other headings remain in the note below. Saving preserves the rest of the Markdown and reports a conflict if the journal changed while you were editing.
 - A split Write/Preview editor with formatting controls and keyboard shortcuts
 - Create and edit forms that write through the same Markdown repository as the API
 - A preview-first HowLongToBeat CSV importer that never overwrites existing notes

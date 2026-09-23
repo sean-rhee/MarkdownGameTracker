@@ -143,6 +143,68 @@
   box-shadow: 0 7px 22px rgba(69, 116, 158, 0.07);
 }
 
+.progress-journal-card {
+  margin-bottom: 1.15rem;
+  padding: clamp(1.2rem, 3vw, 1.7rem);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: 0 7px 22px rgba(69, 116, 158, 0.07);
+}
+
+.progress-journal-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.progress-journal-heading h2 {
+  margin: 0;
+  font-size: clamp(1.3rem, 3vw, 1.65rem);
+}
+
+.progress-journal-editor {
+  margin-bottom: 1rem;
+}
+
+.progress-journal-editor summary {
+  display: inline-block;
+  list-style: none;
+  cursor: pointer;
+}
+
+.progress-journal-editor summary::-webkit-details-marker {
+  display: none;
+}
+
+.progress-journal-editor form {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.progress-journal-editor label {
+  font-weight: 700;
+}
+
+.progress-journal-editor textarea {
+  min-height: 12rem;
+  resize: vertical;
+}
+
+.progress-journal-empty {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.progress-journal-card .progress-journal-body {
+  min-height: 0;
+  padding: 0;
+  color: var(--ink);
+}
+
 .game-details-heading .eyebrow {
   margin-bottom: 0.3rem;
 }

@@ -84,6 +84,56 @@
     </dl>
 </section>
 
+<section id="progress-journal" class="progress-journal-card" aria-labelledby="progressJournalHeading">
+    <div class="progress-journal-heading">
+        <div>
+            <span class="eyebrow">Your playthrough</span>
+            <h2 id="progressJournalHeading">Progress Journal</h2>
+        </div>
+        <span class="note-storage-label">Stored in Obsidian</span>
+    </div>
+
+    @if (Model.ProgressJournal.HasDuplicateHeadings)
+    {
+        <div class="alert alert-warning" role="alert">
+            This note has more than one Progress Journal heading. Edit the full note to combine them before using this section.
+            <a asp-page="/Games/Edit" asp-route-id="@Model.Game.Id">Edit note</a>
+        </div>
+        @if (Model.JournalError is not null)
+        {
+            <div class="alert alert-warning" role="alert">Your draft was not saved. Copy it below before resolving the duplicate headings in the full note.</div>
+            <label asp-for="JournalDraft">Your unsaved Progress Journal draft</label>
+            <textarea asp-for="JournalDraft" class="form-control" rows="12" readonly></textarea>
+        }
+    }
+    else
+    {
+        <details class="progress-journal-editor" data-progress-editor open="@(Model.JournalError is null ? null : "open")">
+            <summary class="btn btn-primary">@(Model.ProgressJournal.Exists ? "Update progress" : "Start a progress journal")</summary>
+            <form method="post" asp-page-handler="SaveProgress" asp-route-id="@Model.Game.Id">
+                @if (Model.JournalError is not null)
+                {
+                    <div class="alert alert-warning" role="alert">@Model.JournalError</div>
+                }
+                <input type="hidden" asp-for="JournalVersion" />
+                <label asp-for="JournalDraft">Progress Journal</label>
+                <textarea asp-for="JournalDraft" class="form-control" rows="12" spellcheck="true"
+                          aria-describedby="progressJournalHelp"></textarea>
+                <p id="progressJournalHelp" class="field-help">Write Markdown here. Use ### for headings within your journal.</p>
+                <button class="btn btn-primary" type="submit">Save progress</button>
+            </form>
+        </details>
+        @if (string.IsNullOrWhiteSpace(Model.ProgressJournal.Content))
+        {
+            <p class="progress-journal-empty">No progress recorded yet.</p>
+        }
+        else
+        {
+            <div class="markdown-body markdown-content progress-journal-body">@Html.Raw(Model.RenderedProgressJournal)</div>
+        }
+    }
+</section>
+
 <div class="modal fade game-screenshot-viewer"
      id="gameScreenshotViewer"
      tabindex="-1"
@@ -162,9 +212,11 @@
     </div>
 </section>
 
-<article class="note-card" aria-label="Markdown notes">
+@if (!string.IsNullOrWhiteSpace(Model.ProgressJournal.OtherMarkdown))
+{
+<article class="note-card" aria-label="Other notes">
     <div class="note-card-heading">
-        <span class="eyebrow">Markdown notes</span>
+        <span class="eyebrow">Other notes</span>
         <div class="note-card-heading-actions">
             <span class="note-storage-label">Stored in Obsidian</span>
             <a class="btn btn-primary markdown-edit-link"
@@ -172,18 +224,9 @@
                asp-route-id="@Model.Game.Id">Edit note</a>
         </div>
     </div>
-    @if (string.IsNullOrWhiteSpace(Model.Game.Markdown))
-    {
-        <div class="empty-note">
-            <p>This note is empty.</p>
-            <a asp-page="/Games/Edit" asp-route-id="@Model.Game.Id">Add some thoughts →</a>
-        </div>
-    }
-    else
-    {
-        <div class="markdown-body markdown-content">@Html.Raw(Model.RenderedMarkdown)</div>
-    }
+    <div class="markdown-body markdown-content">@Html.Raw(Model.RenderedMarkdown)</div>
 </article>
+}
 
 <section class="game-media-collection"
          aria-labelledby="gameMediaHeading"
@@ -241,6 +284,7 @@
 </div>
 
 @section Scripts {
+    <script src="~/js/progress-journal.js" asp-append-version="true"></script>
     <script src="~/js/igdb-client.js" asp-append-version="true"></script>
     <script src="~/js/game-media.js" asp-append-version="true"></script>
     <script src="~/js/igdb-match-picker.js" asp-append-version="true"></script>

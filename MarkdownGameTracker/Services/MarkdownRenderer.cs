@@ -2,6 +2,8 @@ using System.Net;
 using System.Text.RegularExpressions;
 using Markdig;
 using Markdig.Extensions.GenericAttributes;
+using Markdig.Renderers;
+using MarkdownGameTracker.Storage;
 
 namespace MarkdownGameTracker.Services;
 
@@ -28,14 +30,45 @@ public sealed class MarkdownRenderer
             return string.Empty;
         }
 
-        var html = Markdown.ToHtml(markdown, _pipeline);
-        return UrlAttributePattern.Replace(html, match =>
+        return Sanitize(Markdown.ToHtml(markdown, _pipeline));
+    }
+
+    private static string Sanitize(string html) => UrlAttributePattern.Replace(html, match =>
         {
             var url = WebUtility.HtmlDecode(match.Groups["url"].Value);
             return IsSafeUrl(url)
                 ? match.Value
                 : $"{match.Groups["attribute"].Value}=\"#\"";
         });
+
+    public (string Journal, string OtherNotes) RenderSections(string markdown, ProgressJournalSection section)
+    {
+        if (!section.Exists || section.HasDuplicateHeadings)
+        {
+            return (string.Empty, Render(markdown));
+        }
+
+        // Resolve links, images and footnotes against the whole document before splitting its output.
+        var document = Markdown.Parse(markdown, _pipeline);
+        using var journal = new StringWriter();
+        using var other = new StringWriter();
+        var journalRenderer = new HtmlRenderer(journal);
+        var otherRenderer = new HtmlRenderer(other);
+        _pipeline.Setup(journalRenderer);
+        _pipeline.Setup(otherRenderer);
+        foreach (var block in document)
+        {
+            if (block.Span.Start >= section.Start && block.Span.Start < section.End)
+            {
+                if (block is not Markdig.Syntax.HeadingBlock { Level: 2 })
+                    journalRenderer.Render(block);
+            }
+            else
+            {
+                otherRenderer.Render(block);
+            }
+        }
+        return (Sanitize(journal.ToString()), Sanitize(other.ToString()));
     }
 
     private static bool IsSafeUrl(string url)

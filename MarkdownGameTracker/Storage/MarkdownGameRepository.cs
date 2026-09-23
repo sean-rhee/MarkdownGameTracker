@@ -205,6 +205,45 @@ public sealed class MarkdownGameRepository : IGameRepository
         }
     }
 
+    public async Task<ProgressJournalUpdateResult> UpdateProgressJournalAsync(
+        string id, string expectedVersion, string content, CancellationToken cancellationToken)
+    {
+        await _writeLock.WaitAsync(cancellationToken);
+        try
+        {
+            var filePath = FindExistingFile(id);
+            if (filePath is null)
+            {
+                return ProgressJournalUpdateResult.NotFound();
+            }
+
+            var game = await ReadAsync(filePath, cancellationToken);
+            if (!IsGame(game.Frontmatter))
+            {
+                return ProgressJournalUpdateResult.NotFound();
+            }
+
+            if (!ProgressJournalDocument.TryReplace(game.Markdown, expectedVersion, content,
+                    out var updatedMarkdown, out var error))
+            {
+                return error is null ? ProgressJournalUpdateResult.Changed(game)
+                    : new ProgressJournalUpdateResult(false, false, game, error);
+            }
+
+            if (!string.Equals(game.Markdown, updatedMarkdown, StringComparison.Ordinal))
+            {
+                await WriteAtomicallyAsync(filePath,
+                    game.Frontmatter.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
+                    updatedMarkdown, cancellationToken);
+            }
+            return ProgressJournalUpdateResult.Updated(await ReadAsync(filePath, cancellationToken));
+        }
+        finally
+        {
+            _writeLock.Release();
+        }
+    }
+
     private async Task<GameNote> ReadAsync(string filePath, CancellationToken cancellationToken)
     {
         var contents = await File.ReadAllTextAsync(filePath, cancellationToken);
